@@ -31,15 +31,22 @@ export function PoweredBy() {
     <section id="powered-by" className="relative overflow-hidden bg-black py-24 lg:py-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mx-auto mb-16 max-w-3xl text-center lg:mb-20">
-          <span className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-500">
-            [Powered by]
+          <span className="inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.25em] text-neutral-500">
+            [Powered by
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://s3.coinmarketcap.com/static-gravity/image/ef3ad80e423a4449ab8e961b0d1edea4.png"
+              alt="NEAR"
+              className="h-4 w-4 rounded-full"
+            />
+            <span className="text-white">NEAR</span>]
           </span>
-          <h2 className="mt-5 text-4xl font-semibold tracking-tight text-white lg:text-6xl">
+          <h2 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-6xl">
             Built on the most
             <br />
             <span className="font-serif font-normal italic">trusted</span> compute.
           </h2>
-          <p className="mt-6 text-xl text-neutral-500">
+          <p className="mt-6 text-base text-neutral-500 sm:text-xl">
             Hardware-enforced enclaves, frontier open-source models, and one private API —
             wired together so your code never leaves the boundary.
           </p>

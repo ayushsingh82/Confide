@@ -136,34 +136,49 @@ export default function Home() {
       <Navbar />
 
       {/* Hero — black */}
-      <section className="relative overflow-hidden bg-black px-4 pt-44 pb-28 text-center text-white sm:px-6 sm:pt-56 sm:pb-40">
+      <section className="relative overflow-hidden bg-black px-4 pt-32 pb-20 text-center text-white sm:px-6 sm:pt-56 sm:pb-40">
         <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-25">
           <AnimatedWave />
         </div>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_50%_0%,rgba(255,255,255,0.06),transparent_70%)]" />
         <div className="relative z-10 mx-auto max-w-5xl">
           <Reveal>
-            <span className="inline-flex items-center gap-2 rounded-full border border-neutral-800 bg-black/50 px-4 py-1.5 text-[0.7rem] font-medium uppercase tracking-[0.25em] text-neutral-400 backdrop-blur">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Confidential AI IDE
+            <span className="inline-flex max-w-full flex-wrap items-center justify-center gap-x-2.5 gap-y-1 rounded-2xl border border-neutral-800 bg-black/50 px-3 py-1.5 text-[0.6rem] font-medium uppercase tracking-[0.18em] text-neutral-400 backdrop-blur sm:rounded-full sm:px-4 sm:py-1.5 sm:pl-4 sm:pr-3 sm:text-[0.7rem] sm:tracking-[0.25em]">
+              <span className="flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Confidential AI IDE
+              </span>
+              <span className="hidden h-3 w-px bg-neutral-700 sm:block" />
+              <span className="flex items-center gap-1.5">
+                Powered by
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="https://s3.coinmarketcap.com/static-gravity/image/ef3ad80e423a4449ab8e961b0d1edea4.png"
+                  alt="NEAR"
+                  className="h-3.5 w-3.5 rounded-full sm:h-4 sm:w-4"
+                />
+                <span className="text-white">
+                  NEAR<span className="hidden sm:inline"> AI Cloud</span>
+                </span>
+              </span>
             </span>
           </Reveal>
           <Reveal delay={0.08}>
-            <h1 className="mt-9 text-balance text-5xl font-semibold leading-[0.95] tracking-tight sm:text-7xl md:text-8xl">
+            <h1 className="mt-7 text-balance text-[2.25rem] font-semibold leading-[1.05] tracking-tight sm:mt-9 sm:text-7xl sm:leading-[0.95] md:text-8xl">
               Code with AI.
               <br />
               <span className="font-serif font-normal italic">Prove</span> nothing leaked.
             </h1>
           </Reveal>
           <Reveal delay={0.16}>
-            <p className="mx-auto mt-8 max-w-xl text-lg leading-relaxed text-neutral-400 sm:text-xl">
+            <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-neutral-400 sm:mt-8 sm:text-xl">
               Confide is the IDE that runs every AI completion inside a hardware-isolated
               enclave on NEAR AI Cloud. Your code, prompts, and context stay inside your
               boundary — and every reply comes with a cryptographic receipt.
             </p>
           </Reveal>
           <Reveal delay={0.24}>
-            <div className="mt-11 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
+            <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:mt-11 sm:flex-row sm:gap-4">
               <Link
                 href="/chat"
                 className="min-h-[48px] w-full rounded-full bg-white px-8 py-4 text-sm font-medium text-black transition hover:bg-neutral-200 sm:w-auto"
@@ -189,7 +204,7 @@ export default function Home() {
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-500">
                 How it works
               </p>
-              <h2 className="mt-5 text-balance text-5xl font-semibold leading-[1.0] tracking-tight sm:text-6xl">
+              <h2 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl">
                 Three steps, <span className="font-serif font-normal italic">zero</span> exposure.
               </h2>
             </div>
@@ -215,15 +230,19 @@ export default function Home() {
       {/* Features — the single inverted (WHITE) section, square boxes */}
       <section
         id="features"
-        className="bg-white px-4 py-28 text-neutral-950 sm:px-6 sm:py-40"
+        className="relative overflow-hidden bg-white px-4 py-28 text-neutral-950 sm:px-6 sm:py-40"
       >
-        <div className="mx-auto max-w-6xl">
+        <div className="pointer-events-none absolute inset-0 opacity-20">
+          <AnimatedWave tone="dark" />
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(0,0,0,0.04),transparent_70%)]" />
+        <div className="relative z-10 mx-auto max-w-6xl">
           <Reveal>
             <div className="max-w-3xl">
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-400">
                 Features
               </p>
-              <h2 className="mt-5 text-balance text-5xl font-semibold leading-[1.0] tracking-tight sm:text-6xl">
+              <h2 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl">
                 Everything an IDE does,{" "}
                 <span className="font-serif font-normal italic">attested</span>.
               </h2>
@@ -256,7 +275,7 @@ export default function Home() {
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-500">
                 Who it’s for
               </p>
-              <h2 className="mt-5 text-balance text-5xl font-semibold leading-[1.0] tracking-tight sm:text-6xl">
+              <h2 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl">
                 Built for teams that{" "}
                 <span className="font-serif font-normal italic">cannot</span> leak.
               </h2>
@@ -266,7 +285,7 @@ export default function Home() {
             <div className="mt-16 grid gap-px border border-neutral-900 bg-neutral-900 sm:grid-cols-3">
               {useCases.map((u) => (
                 <div key={u.title} className="bg-black p-10 sm:p-12">
-                  <h3 className="text-3xl font-semibold tracking-tight">{u.title}</h3>
+                  <h3 className="text-2xl font-semibold tracking-tight sm:text-3xl">{u.title}</h3>
                   <p className="mt-5 text-[0.95rem] leading-relaxed text-neutral-400">{u.body}</p>
                 </div>
               ))}
@@ -283,7 +302,7 @@ export default function Home() {
               <p className="font-mono text-xs uppercase tracking-[0.25em] text-neutral-500">
                 Pricing
               </p>
-              <h2 className="mt-5 text-balance text-5xl font-semibold leading-[1.0] tracking-tight sm:text-6xl">
+              <h2 className="mt-5 text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl">
                 Start small, scale by{" "}
                 <span className="font-serif font-normal italic">verified</span> call.
               </h2>
@@ -318,7 +337,7 @@ export default function Home() {
                   </div>
 
                   <div className="mb-8 border-b border-neutral-900 pb-8">
-                    <span className="text-5xl font-semibold tracking-tight lg:text-6xl">
+                    <span className="text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
                       {plan.price}
                     </span>
                     {plan.per && (
@@ -359,7 +378,7 @@ export default function Home() {
       <section className="bg-black px-4 pb-28 text-white sm:px-6 sm:pb-40">
         <Reveal className="mx-auto max-w-5xl">
           <div className="border border-neutral-900 bg-neutral-950 px-6 py-20 text-center sm:px-12 sm:py-28">
-            <h2 className="text-balance text-5xl font-semibold leading-[1.0] tracking-tight sm:text-6xl md:text-7xl">
+            <h2 className="text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl lg:text-7xl">
               Stop trusting. <span className="font-serif font-normal italic">Start</span>{" "}
               verifying.
             </h2>

@@ -12,6 +12,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  /* Keep anchor targets clear of the fixed navbar (h-20 → h-14 when scrolled). */
+  scroll-padding-top: 6rem;
+  scroll-behavior: smooth;
+}
+
 html, body {
   background: var(--background);
   color: var(--foreground);

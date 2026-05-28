@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 
 const navLinks = [
-  { name: "How it works", href: "/#how" },
   { name: "Features", href: "/#features" },
   { name: "Pricing", href: "/#pricing" },
 ];
@@ -53,14 +52,26 @@ export function Navbar() {
       }`}
     >
       <nav
-        className={`mx-auto transition-all duration-500 ${
+        style={{
+          transitionProperty:
+            "max-width, background-color, border-color, border-radius, box-shadow, backdrop-filter, -webkit-backdrop-filter",
+          transitionDuration: "600ms",
+          transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
+          willChange: "max-width, background-color, backdrop-filter",
+        }}
+        className={`mx-auto border ${
           isScrolled || isMobileMenuOpen
-            ? "max-w-[1200px] rounded-2xl border border-neutral-800 bg-black/70 shadow-[0_0_40px_-12px_rgba(255,255,255,0.15)] backdrop-blur-xl"
-            : "max-w-[1400px] bg-transparent"
+            ? "max-w-[1200px] rounded-2xl border-neutral-800 bg-black/70 shadow-[0_0_40px_-12px_rgba(255,255,255,0.15)] backdrop-blur-xl"
+            : "max-w-[1400px] rounded-none border-transparent bg-transparent shadow-none backdrop-blur-0"
         }`}
       >
         <div
-          className={`flex items-center justify-between px-6 transition-all duration-500 lg:px-8 ${
+          style={{
+            transitionProperty: "height, padding",
+            transitionDuration: "600ms",
+            transitionTimingFunction: "cubic-bezier(0.4, 0, 0.2, 1)",
+          }}
+          className={`flex items-center justify-between px-6 lg:px-8 ${
             isScrolled ? "h-14" : "h-20"
           }`}
         >
@@ -76,6 +87,15 @@ export function Navbar() {
                 }`}
               >
                 Confide
+              </span>
+              <span className="hidden items-center gap-1.5 rounded-full border border-neutral-800 bg-black/50 px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.18em] text-neutral-400 backdrop-blur sm:inline-flex">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="https://s3.coinmarketcap.com/static-gravity/image/ef3ad80e423a4449ab8e961b0d1edea4.png"
+                  alt="NEAR"
+                  className="h-3 w-3 rounded-full"
+                />
+                on NEAR
               </span>
             </Link>
           </motion.div>

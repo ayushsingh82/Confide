@@ -4,9 +4,13 @@ import { useEffect, useRef } from "react";
 
 /**
  * Animated ASCII wave on a canvas — interfering sine waves rendered as a
- * grid of mono glyphs. Dark-theme variant: white glyphs over transparent bg.
+ * grid of mono glyphs. Pass tone="dark" to draw black glyphs (for light bgs).
  */
-export function AnimatedWave() {
+export function AnimatedWave({
+  tone = "light",
+}: {
+  tone?: "light" | "dark";
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef(0);
 
@@ -56,7 +60,8 @@ export function AnimatedWave() {
           const charIndex = Math.floor(normalized * (chars.length - 1));
           const alpha = 0.15 + normalized * 0.5;
 
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          const rgb = tone === "dark" ? "0, 0, 0" : "255, 255, 255";
+          ctx.fillStyle = `rgba(${rgb}, ${alpha})`;
           ctx.fillText(chars[charIndex], px, py);
         }
       }
