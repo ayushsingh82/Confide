@@ -48,55 +48,56 @@ Inspired by [Orgn](https://www.orgn.com/), built on the open NEAR AI stack.
 
 ### Component diagram
 
-```mermaid
-flowchart LR
-    subgraph User[User device]
-        U[Confide IDE\nNext.js + React 19]
-    end
-
-    subgraph Server[Confide server]
-        API[/api/chat\nNext.js route]
-        SC[Scanner UI\nattestation panel]
-    end
-
-    subgraph NEAR[NEAR AI Cloud]
-        GW[Gateway\nOpenAI-compatible]
-        TEE[Intel TDX TEE\n+ H100 CC GPU]
-        M1[GLM-4.6 FP8]
-        M2[DeepSeek V3.1]
-        M3[GPT-OSS 120B]
-        M4[Qwen3 30B]
-        ATT[Attestation\nservice]
-    end
-
-    U -->|prompt| API
-    API -->|sk-... bearer| GW
-    GW --> TEE
-    TEE --> M1 & M2 & M3 & M4
-    TEE --> ATT
-    ATT -->|signed receipt| API
-    API -->|reply + receipt| U
-    U --> SC
+```
+┌──────────────────────────┐   ┌──────────────────────────┐   ┌──────────────────────────────┐
+│ USER DEVICE              │   │ CONFIDE SERVER           │   │ NEAR AI CLOUD                │
+│                          │   │                          │   │                              │
+│  ┌────────────────────┐  │   │  ┌────────────────────┐  │   │  ┌────────────────────────┐  │
+│  │ Confide IDE        │──┼───┼─▶│ /api/chat          │──┼───┼─▶│ Gateway                │  │
+│  │ Next.js + React 19 │  │   │  │ Next.js route      │  │   │  │ OpenAI-compatible      │  │
+│  └─────────▲──────────┘  │   │  └─────────┬──────────┘  │   │  └───────────┬────────────┘  │
+│            │             │   │            │             │   │              ▼               │
+│  ┌─────────┴──────────┐  │   │  ┌─────────▼──────────┐  │   │  ┌────────────────────────┐  │
+│  │ Scanner UI         │◀─┼───┼──│ Attestation parser │  │   │  │ Intel TDX TEE          │  │
+│  │ attestation panel  │  │   │  └────────────────────┘  │   │  │ + H100 CC GPU          │  │
+│  └────────────────────┘  │   │                          │   │  │   ├─ GLM-4.6 FP8       │  │
+└──────────────────────────┘   └──────────────────────────┘   │  │   ├─ DeepSeek V3.1     │  │
+                                                              │  │   ├─ GPT-OSS 120B      │  │
+                                                              │  │   └─ Qwen3 30B         │  │
+                                                              │  └───────────┬────────────┘  │
+                                                              │              ▼               │
+                                                              │  ┌────────────────────────┐  │
+                                                              │  │ Attestation service    │  │
+                                                              │  │ signs receipt          │  │
+                                                              │  └────────────────────────┘  │
+                                                              └──────────────────────────────┘
 ```
 
 ### Sequence — a single prompt's lifecycle
 
-```mermaid
-sequenceDiagram
-    actor Dev as Developer
-    participant IDE as Confide IDE
-    participant SRV as /api/chat
-    participant NEAR as NEAR AI Cloud (TEE)
-    participant SCAN as Scanner panel
-
-    Dev->>IDE: type prompt
-    IDE->>SRV: POST /api/chat { messages, model }
-    SRV->>NEAR: POST /v1/chat/completions (Bearer sk-...)
-    Note over NEAR: prompt decrypted inside TEE,<br/>model inference runs,<br/>output + attestation signed
-    NEAR-->>SRV: reply + attestation receipt
-    SRV-->>IDE: reply + receipt
-    IDE-->>Dev: render reply
-    IDE-->>SCAN: render receipt card<br/>(TEE type, model hash, latency)
+```
+   Developer        Confide IDE       /api/chat        NEAR TEE        Scanner
+       │                │                 │                │              │
+       │── type ───────▶│                 │                │              │
+       │   prompt       │                 │                │              │
+       │                │── POST /api ───▶│                │              │
+       │                │   /chat         │                │              │
+       │                │                 │── POST /v1/ ──▶│              │
+       │                │                 │   completions  │              │
+       │                │                 │  (Bearer sk-…) │              │
+       │                │                 │                │ decrypt in   │
+       │                │                 │                │ TEE,          │
+       │                │                 │                │ run model,    │
+       │                │                 │                │ sign receipt  │
+       │                │                 │◀── reply + ────│              │
+       │                │                 │    receipt     │              │
+       │                │◀── reply +──────│                │              │
+       │                │    receipt      │                │              │
+       │◀── render ─────│                 │                │              │
+       │   reply        │                 │                │              │
+       │                │── render ───────┼────────────────┼─────────────▶│
+       │                │   receipt card  │                │              │
+       ▼                ▼                 ▼                ▼              ▼
 ```
 
 ---
