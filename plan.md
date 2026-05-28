@@ -1,7 +1,6 @@
 # Project Plan — Confidential AI MVP on NEAR AI Cloud
 
 > Working title: **Confide** (placeholder — rename anytime)
-> Inspiration: Orgn (orgn.com) — confidential AI stack for defense & regulated industry
 > Infrastructure: NEAR AI Cloud (TEE-backed OpenAI-compatible inference)
 
 ---
@@ -22,7 +21,7 @@ Pitch: *"Stop trusting. Start verifying."*
 
 | In scope | Out of scope (for now) |
 |---|---|
-| Marketing landing page (dark theme, Orgn-style) | Multi-tenant org management |
+| Marketing landing page (dark theme) | Multi-tenant org management |
 | Chat UI calling NEAR AI `/v1/chat/completions` | Air-gapped / on-prem deployment |
 | Scanner panel showing live attestation receipts | Custom TEE infrastructure |
 | Model picker (GLM-4.6, DeepSeek V3.1, GPT-OSS 120B, Qwen3 30B) | FedRAMP / IL5–6 compliance |
@@ -171,7 +170,7 @@ Auth: `Authorization: Bearer sk-...` stored in `.env.local`. Never exposed to th
 - **Real attestation shape**: NEAR's exact response fields for TEE attestation aren't visible without an API key. Need to call `/v1/chat/completions` once with a real key to inspect headers/extra fields.
 - **Naming**: `Confide` is placeholder. Real candidates: Sentinel, Vault, Hush, Cipher, Attest.
 - **Audit storage**: Per-browser (localStorage) for MVP. Server-side audit DB is post-MVP.
-- **Pricing display**: Mirror Orgn's two-tier as marketing, no real Stripe yet.
+- **Pricing display**: Two-tier marketing copy only, no real Stripe yet.
 
 ---
 

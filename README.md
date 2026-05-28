@@ -7,7 +7,7 @@ Trusted Execution Environment (TEE) on **NEAR AI Cloud**. Your code, prompts,
 and context never leave your boundary — and every reply ships with a
 cryptographic attestation receipt you can verify in under 30 seconds.
 
-Inspired by [Orgn](https://www.orgn.com/), built on the open NEAR AI stack.
+Built on the open NEAR AI stack.
 
 ---
 

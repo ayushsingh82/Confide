@@ -81,6 +81,14 @@ export function Navbar() {
             transition={{ duration: 0.6, delay: 0.25, ease: ENTER_EASE }}
           >
             <Link href="/" className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/logo/logo.svg"
+                alt="Confide"
+                className={`transition-all duration-500 ${
+                  isScrolled ? "h-6 w-6" : "h-7 w-7"
+                }`}
+              />
               <span
                 className={`font-semibold tracking-tight text-white transition-all duration-500 ${
                   isScrolled ? "text-xl" : "text-2xl"
