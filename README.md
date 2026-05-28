@@ -168,11 +168,18 @@ near boom/
 
 ## Status
 
-- ✅ Landing page (dark theme, animated, full sections)
-- ⏳ `/chat` workspace + `/api/chat` route
-- ⏳ Live attestation receipts in the Scanner panel
-- ⏳ Model picker (calls `GET /v1/model/list`)
-- ⏳ Local audit log
+- ✅ Landing page (dark theme, animated, full sections, mobile-responsive, NEAR branding)
+- ✅ Confide logo + browser favicon
+- ✅ `/chat` workspace UI (two-pane: chat + Scanner)
+- ✅ `/api/chat` server route proxying to `cloud-api.near.ai/v1/chat/completions`
+- ✅ Scanner panel renders real fields when NEAR returns them; graceful stub when key/credits absent
+- ✅ Model picker wired to NEAR's real model IDs (Claude Opus 4.7, GLM 5.1, DeepSeek V3.1, GPT-OSS 120B, Qwen3 30B)
+- ✅ Profitable pricing tiers based on NEAR's actual cost-per-million-token math
+- ✅ Full NEAR AI Cloud docs captured in `md/` (quickstart, models, reasoning, private inference, gateway/TLS attestation, complete API endpoint reference)
+- ⏳ Live TEE attestation against a real response (blocked on NEAR account credits — key set but `HTTP 402 no_limit_configured`)
+- ⏳ "Verify receipt" button that calls `/v1/attestation/report` per message
+- ⏳ Local audit log (browser localStorage for receipt history)
+- ⏳ Live model list (call `GET /v1/model/list` instead of hardcoded picker)
 
 See [md/plan.md](./md/plan.md) for the full roadmap and [md/](./md) for the NEAR AI Cloud docs we've captured (quickstart, models, reasoning, private inference, gateway + TLS attestation, API endpoint reference).
 
