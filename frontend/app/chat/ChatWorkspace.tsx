@@ -1,0 +1,400 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { AVAILABLE_MODELS } from "@/lib/types";
+import type { ChatResponseBody, Message, Receipt } from "@/lib/types";
+
+interface Turn {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  receipt?: Receipt;
+  error?: string;
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function shortHash(h?: string) {
+  if (!h) return "—";
+  if (h.length <= 12) return h;
+  return `${h.slice(0, 6)}…${h.slice(-4)}`;
+}
+
+export function ChatWorkspace() {
+  const [model, setModel] = useState(AVAILABLE_MODELS[0].id);
+  const [input, setInput] = useState("");
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [pending, setPending] = useState(false);
+  const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [turns, pending]);
+
+  const activeReceipt =
+    turns.find((t) => t.id === activeReceiptId)?.receipt ??
+    [...turns].reverse().find((t) => t.receipt)?.receipt;
+
+  async function send() {
+    const trimmed = input.trim();
+    if (!trimmed || pending) return;
+
+    const userTurn: Turn = { id: uid(), role: "user", content: trimmed };
+    setTurns((t) => [...t, userTurn]);
+    setInput("");
+    setPending(true);
+
+    const history: Message[] = [...turns, userTurn].map((t) => ({
+      role: t.role,
+      content: t.content,
+    }));
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ model, messages: history }),
+      });
+      const data = (await res.json()) as ChatResponseBody | { error: string };
+
+      if (!res.ok || "error" in data) {
+        const err = "error" in data ? data.error : `HTTP ${res.status}`;
+        setTurns((t) => [
+          ...t,
+          { id: uid(), role: "assistant", content: "", error: err },
+        ]);
+      } else {
+        const id = uid();
+        setTurns((t) => [
+          ...t,
+          { id, role: "assistant", content: data.reply, receipt: data.receipt },
+        ]);
+        setActiveReceiptId(id);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Unknown error";
+      setTurns((t) => [
+        ...t,
+        { id: uid(), role: "assistant", content: "", error: message },
+      ]);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  function onKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void send();
+    }
+  }
+
+  return (
+    <div className="flex h-screen flex-col bg-black text-white">
+      {/* Workspace toolbar */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-900 bg-black px-4 sm:px-6">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-lg font-semibold tracking-tight">
+            Confide
+          </Link>
+          <span className="hidden font-mono text-[0.65rem] uppercase tracking-[0.25em] text-neutral-500 sm:inline">
+            / workspace
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="hidden text-xs text-neutral-500 sm:block">Model</label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded-md border border-neutral-800 bg-black px-3 py-1.5 text-sm text-white focus:border-neutral-600 focus:outline-none"
+          >
+            {AVAILABLE_MODELS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      {/* Two-pane layout */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {/* Chat */}
+        <section className="flex min-h-0 flex-1 flex-col">
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto px-4 py-6 sm:px-8"
+          >
+            {turns.length === 0 && !pending && (
+              <EmptyState />
+            )}
+            <div className="mx-auto max-w-3xl space-y-6">
+              {turns.map((turn) => (
+                <TurnView
+                  key={turn.id}
+                  turn={turn}
+                  isActive={turn.id === activeReceiptId}
+                  onSelect={() =>
+                    turn.receipt ? setActiveReceiptId(turn.id) : undefined
+                  }
+                />
+              ))}
+              {pending && (
+                <div className="flex items-center gap-2 text-sm text-neutral-500">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                  Routing through TEE…
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-neutral-900 bg-black px-4 py-4 sm:px-8">
+            <div className="mx-auto max-w-3xl">
+              <div className="flex items-end gap-3 rounded-2xl border border-neutral-800 bg-neutral-950 p-3 focus-within:border-neutral-600">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={onKey}
+                  rows={2}
+                  placeholder="Ask the IDE — your prompt runs inside a TEE…"
+                  className="flex-1 resize-none bg-transparent text-sm text-white placeholder:text-neutral-600 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => void send()}
+                  disabled={pending || !input.trim()}
+                  className="shrink-0 rounded-full bg-white px-4 py-2 text-xs font-medium text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-neutral-800 disabled:text-neutral-500"
+                >
+                  {pending ? "…" : "Send"}
+                </button>
+              </div>
+              <p className="mt-2 text-center text-[0.65rem] uppercase tracking-[0.25em] text-neutral-600">
+                Cmd / Ctrl + Enter to send
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Scanner */}
+        <aside className="flex w-full shrink-0 flex-col border-t border-neutral-900 bg-neutral-950 md:w-[360px] md:border-l md:border-t-0">
+          <ScannerPanel receipt={activeReceipt} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  const samples = [
+    "Write a SQL migration that adds a NOT NULL column with a backfill default.",
+    "Explain how Intel TDX attestation works in plain English.",
+    "Review this auth middleware for token-leak risks.",
+  ];
+  return (
+    <div className="mx-auto max-w-2xl py-12 text-center">
+      <p className="font-mono text-[0.7rem] uppercase tracking-[0.25em] text-neutral-600">
+        New workspace
+      </p>
+      <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+        Ask anything. <span className="font-serif italic">Verify</span> everything.
+      </h1>
+      <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+        Every prompt routes to a confidential enclave on NEAR AI Cloud and comes
+        back with an attestation receipt in the Scanner panel.
+      </p>
+      <div className="mt-10 grid gap-2 text-left">
+        {samples.map((s) => (
+          <div
+            key={s}
+            className="rounded-xl border border-neutral-900 bg-black px-4 py-3 text-sm text-neutral-400"
+          >
+            {s}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TurnView({
+  turn,
+  isActive,
+  onSelect,
+}: {
+  turn: Turn;
+  isActive: boolean;
+  onSelect: () => void;
+}) {
+  if (turn.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-white px-4 py-2.5 text-sm text-black">
+          {turn.content}
+        </div>
+      </div>
+    );
+  }
+
+  if (turn.error) {
+    return (
+      <div className="rounded-xl border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+        <span className="font-mono text-[0.65rem] uppercase tracking-widest text-red-400">
+          Error
+        </span>
+        <div className="mt-1 whitespace-pre-wrap">{turn.error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onSelect();
+      }}
+      className={`cursor-pointer rounded-2xl border px-4 py-3 text-sm leading-relaxed text-neutral-200 transition ${
+        isActive
+          ? "border-neutral-700 bg-neutral-900"
+          : "border-neutral-900 bg-neutral-950 hover:border-neutral-800"
+      }`}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="font-mono text-[0.65rem] uppercase tracking-widest text-neutral-500">
+          {turn.receipt?.mocked ? "Stub" : turn.receipt?.attested ? "Attested ✓" : "Reply"}
+        </span>
+        {turn.receipt && (
+          <span className="font-mono text-[0.65rem] text-neutral-600">
+            {turn.receipt.model} · {turn.receipt.latencyMs}ms
+          </span>
+        )}
+      </div>
+      <div className="whitespace-pre-wrap">{turn.content}</div>
+    </div>
+  );
+}
+
+function ScannerPanel({ receipt }: { receipt: Receipt | undefined }) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex h-14 shrink-0 items-center border-b border-neutral-900 px-5">
+        <span className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-neutral-500">
+          Scanner
+        </span>
+        <span className="ml-auto flex items-center gap-2 text-[0.7rem] text-neutral-500">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              receipt?.attested
+                ? "bg-emerald-400"
+                : receipt?.mocked
+                ? "bg-amber-400"
+                : "bg-neutral-700"
+            }`}
+          />
+          {receipt?.attested
+            ? "attested"
+            : receipt?.mocked
+            ? "stub (no key)"
+            : "idle"}
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        {!receipt ? (
+          <div className="text-sm text-neutral-500">
+            Send a prompt to see its attestation receipt here.
+          </div>
+        ) : (
+          <dl className="space-y-4 text-sm">
+            <Row label="Model" value={receipt.model} />
+            <Row
+              label="Status"
+              value={
+                receipt.mocked
+                  ? "Stub response (NEAR_API_KEY not set)"
+                  : receipt.attested
+                  ? "Attested inside TEE"
+                  : "Completed (no attestation field)"
+              }
+              tone={
+                receipt.mocked ? "warn" : receipt.attested ? "ok" : "neutral"
+              }
+            />
+            <Row label="TEE" value={receipt.tee ?? "—"} mono />
+            <Row
+              label="Att. hash"
+              value={shortHash(receipt.attestationHash)}
+              mono
+            />
+            <Row label="Request ID" value={receipt.requestId ?? "—"} mono />
+            <Row
+              label="Latency"
+              value={`${receipt.latencyMs.toLocaleString()} ms`}
+              mono
+            />
+            <Row label="Finish" value={receipt.finishReason ?? "—"} mono />
+            <Row
+              label="Tokens"
+              value={
+                receipt.usage
+                  ? `${receipt.usage.promptTokens ?? "?"} in · ${
+                      receipt.usage.completionTokens ?? "?"
+                    } out`
+                  : "—"
+              }
+              mono
+            />
+            {receipt.raw !== undefined && (
+              <details className="rounded-lg border border-neutral-900 bg-black p-3">
+                <summary className="cursor-pointer text-[0.7rem] uppercase tracking-widest text-neutral-500">
+                  Raw response
+                </summary>
+                <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.7rem] text-neutral-400">
+                  {JSON.stringify(receipt.raw, null, 2)}
+                </pre>
+              </details>
+            )}
+          </dl>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Row({
+  label,
+  value,
+  mono,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  tone?: "neutral" | "ok" | "warn";
+}) {
+  const toneClass =
+    tone === "ok"
+      ? "text-emerald-300"
+      : tone === "warn"
+      ? "text-amber-300"
+      : "text-neutral-200";
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <dt className="text-[0.7rem] uppercase tracking-widest text-neutral-500">
+        {label}
+      </dt>
+      <dd
+        className={`text-right ${mono ? "font-mono text-xs" : "text-sm"} ${toneClass}`}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
