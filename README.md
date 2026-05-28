@@ -174,7 +174,7 @@ near boom/
 - ⏳ Model picker (calls `GET /v1/model/list`)
 - ⏳ Local audit log
 
-See [plan.md](./plan.md) for the full roadmap.
+See [md/plan.md](./md/plan.md) for the full roadmap and [md/](./md) for the NEAR AI Cloud docs we've captured (quickstart, models, reasoning, private inference, gateway + TLS attestation, API endpoint reference).
 
 ---
 

@@ -80,13 +80,14 @@ export function Navbar() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.25, ease: ENTER_EASE }}
           >
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-0.5" aria-label="Confide — home">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/logo/logo.svg"
-                alt="Confide"
+                alt=""
+                aria-hidden="true"
                 className={`transition-all duration-500 ${
-                  isScrolled ? "h-6 w-6" : "h-7 w-7"
+                  isScrolled ? "h-7 w-7" : "h-8 w-8"
                 }`}
               />
               <span
@@ -94,16 +95,7 @@ export function Navbar() {
                   isScrolled ? "text-xl" : "text-2xl"
                 }`}
               >
-                Confide
-              </span>
-              <span className="hidden items-center gap-1.5 rounded-full border border-neutral-800 bg-black/50 px-2 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.18em] text-neutral-400 backdrop-blur sm:inline-flex">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="https://s3.coinmarketcap.com/static-gravity/image/ef3ad80e423a4449ab8e961b0d1edea4.png"
-                  alt="NEAR"
-                  className="h-3 w-3 rounded-full"
-                />
-                on NEAR
+                onfide
               </span>
             </Link>
           </motion.div>
