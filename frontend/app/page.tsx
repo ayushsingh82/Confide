@@ -381,8 +381,8 @@ export default function Home() {
           <div className="relative overflow-hidden bg-black px-6 py-20 text-center sm:px-12 sm:py-28">
             <div className="pointer-events-none absolute inset-0">
               <MagicRings
-                color="#A855F7"
-                colorTwo="#6366F1"
+                color="#FFFFFF"
+                colorTwo="#C0C0C0"
                 ringCount={6}
                 speed={1}
                 attenuation={10}
