@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { TopBar } from "@/app/components/workspace/TopBar";
 import { AVAILABLE_MODELS } from "@/lib/types";
 import type { ChatResponseBody, Message, Receipt } from "@/lib/types";
+import { logUsage, receiptToEvent } from "@/lib/usage";
 
 interface Turn {
   id: string;
@@ -76,6 +77,8 @@ export function ChatWorkspace() {
           { id, role: "assistant", content: data.reply, receipt: data.receipt },
         ]);
         setActiveReceiptId(id);
+        const event = receiptToEvent(data.receipt);
+        if (event) logUsage(event);
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "Unknown error";
@@ -96,32 +99,25 @@ export function ChatWorkspace() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-black text-white">
-      {/* Workspace toolbar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-900 bg-black px-4 sm:px-6">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
-            Confide
-          </Link>
-          <span className="hidden font-mono text-[0.65rem] uppercase tracking-[0.25em] text-neutral-500 sm:inline">
-            / workspace
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="hidden text-xs text-neutral-500 sm:block">Model</label>
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="rounded-md border border-neutral-800 bg-black px-3 py-1.5 text-sm text-white focus:border-neutral-600 focus:outline-none"
-          >
-            {AVAILABLE_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </header>
+    <div className="flex h-full flex-col bg-black text-white">
+      <TopBar
+        rightSlot={
+          <>
+            <label className="hidden text-xs text-neutral-500 sm:block">Model</label>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="rounded-md border border-neutral-800 bg-black px-3 py-1.5 text-sm text-white focus:border-neutral-600 focus:outline-none"
+            >
+              {AVAILABLE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+      />
 
       {/* Two-pane layout */}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">

@@ -1,0 +1,40 @@
+// Inline SVG data URIs for provider mark badges used in the OrbitImages component.
+// Renders crisply on dark backgrounds; no external network dependency.
+
+function makeBadge(letter: string, bg: string, fg = "#fff") {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='${bg}'/><text x='50' y='54' text-anchor='middle' dominant-baseline='middle' font-family='-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Inter,sans-serif' font-size='52' font-weight='700' fill='${fg}'>${letter}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+export const PROVIDER_LOGOS = [
+  { name: "OpenAI", url: makeBadge("O", "#10A37F") },
+  { name: "Anthropic", url: makeBadge("A", "#D97757") },
+  { name: "Google", url: makeBadge("G", "#4285F4") },
+  { name: "DeepSeek", url: makeBadge("D", "#4D6BFE") },
+  { name: "Alibaba / Qwen", url: makeBadge("Q", "#7C3AED") },
+  { name: "Z.ai / GLM", url: makeBadge("Z", "#14B8A6") },
+  { name: "Moonshot / Kimi", url: makeBadge("K", "#0F172A", "#E2E8F0") },
+  { name: "Black Forest Labs / FLUX", url: makeBadge("F", "#1F2937") },
+];
+
+export const PROVIDER_LOGO_URLS = PROVIDER_LOGOS.map((p) => p.url);
+
+/** Look up the brand logo for a model creator. */
+export function logoForCreator(creator: string): string {
+  const c = creator.toLowerCase();
+  if (c.includes("openai")) return makeBadge("O", "#10A37F");
+  if (c.includes("anthropic")) return makeBadge("A", "#D97757");
+  if (c.includes("google")) return makeBadge("G", "#4285F4");
+  if (c.includes("deepseek")) return makeBadge("D", "#4D6BFE");
+  if (c.includes("alibaba") || c.includes("qwen")) return makeBadge("Q", "#7C3AED");
+  if (c.includes("z.ai") || c.includes("zai") || c.includes("glm"))
+    return makeBadge("Z", "#14B8A6");
+  if (c.includes("moonshot") || c.includes("kimi"))
+    return makeBadge("K", "#0F172A", "#E2E8F0");
+  if (c.includes("black forest") || c.includes("flux")) return makeBadge("F", "#1F2937");
+  return makeBadge(creator.charAt(0).toUpperCase(), "#525252");
+}
+
+/** Public URL for the NEAR brand mark (CoinMarketCap mirror). */
+export const NEAR_LOGO_URL =
+  "https://s3.coinmarketcap.com/static-gravity/image/ef3ad80e423a4449ab8e961b0d1edea4.png";

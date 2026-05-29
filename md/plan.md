@@ -165,7 +165,196 @@ Auth: `Authorization: Bearer sk-...` stored in `.env.local`. Never exposed to th
 
 ---
 
-## 10. Open Questions
+## 10. Privacy Upgrade — Remove Confide from the Plaintext Path
+
+> **Status:** committed upgrade. The MVP shipped with our `/api/chat` proxy reading prompts in plaintext before forwarding to NEAR. Marketing copy currently says "TLS terminates inside the TEE" (true) but cannot claim "we never see your prompts" (false). This section is the plan to make that second claim defensible.
+
+### Current architecture (what we have today)
+
+```
+browser  ──HTTPS──▶  /api/chat (Next.js, our server)  ──HTTPS──▶  cloud-api.near.ai (TEE)
+                          ▲
+                          │
+              TLS terminates here → we
+              read req.json() before
+              forwarding upstream
+```
+
+Trust boundary: the user has to trust **Confide** + NEAR. Two TEEs (gateway + model) protect against NEAR, but our middle hop is a regular Node process.
+
+### Target architecture (what we want)
+
+Trust boundary collapses to **just NEAR** (and the user). Two options:
+
+#### Option A — BYOK + browser-direct (Starter tier)
+
+```
+browser  ──HTTPS──▶  cloud-api.near.ai (TEE)
+   ▲
+   │
+   user pastes sk-... once,
+   stored in browser only
+```
+
+- User pastes their NEAR key on first visit; stored in `localStorage` (or IndexedDB) — never sent to our server.
+- Browser calls `cloud-api.near.ai/v1/chat/completions` directly with `Authorization: Bearer sk-...`.
+- Our `/api/chat` route is bypassed entirely for Starter users.
+- Scanner panel still works — it reads `data.attestation` straight from the NEAR response.
+
+**Pros:** zero changes to backend; cheapest to ship; perfectly honest "we don't see prompts".
+**Cons:** key lives in the browser; user has to manage it; CORS depends on NEAR allowing browser origins (likely fine for `cloud-api.near.ai` since their docs show JS clients).
+
+**Risks to verify:**
+- CORS preflight on `cloud-api.near.ai` — does it `Access-Control-Allow-Origin: *` for `/v1/chat/completions`? Test before committing.
+- XSS would steal the key. Mitigate with strict CSP and `localStorage` over `sessionStorage` choice depending on threat model.
+
+#### Option B — E2EE Chat for hosted Pro tier
+
+NEAR exposes an E2EE Chat Completions endpoint (`Guides > E2EE Chat` in the docs). Approach:
+
+1. Fetch NEAR's enclave public key on session start (signed by TEE attestation).
+2. Browser encrypts the prompt body with that key.
+3. Browser POSTs ciphertext to our `/api/chat`.
+4. Our proxy forwards ciphertext as-is to NEAR's E2EE endpoint.
+5. NEAR decrypts inside the TEE, runs inference, encrypts the reply, signs it.
+6. We forward ciphertext back to the browser, which decrypts.
+
+```
+browser ──ciphertext──▶ /api/chat ──ciphertext──▶ NEAR E2EE TEE
+   ▲           (we only see encrypted bytes)         │
+   └────────── ciphertext (signed) ──────────────────┘
+```
+
+**Pros:** hosted experience (no BYOK), still cryptographically defensible. Keeps the audit dashboard / receipt history that hosted Pro users want.
+**Cons:** more code; need to integrate WebCrypto (or libsodium) in the browser; have to handle key-rotation when NEAR rotates the enclave key.
+
+**Implementation notes:**
+- Read NEAR's E2EE Chat guide (`md/` — capture this once we have the doc).
+- Public-key shape: probably X25519 + AES-GCM (libsodium `crypto_box`-style) — match NEAR's spec exactly.
+- Verify the enclave public key against the attestation report's `signing_address` before encrypting — otherwise an attacker MITM-ing our proxy could substitute a key.
+
+### Recommended path
+
+1. **First** — Ship Option A for Starter. Tiny change; one tier becomes provably private. Use it as the demo / pitch artifact.
+2. **Then** — Add Option B for Pro. Larger investment but it unlocks the hosted-defensible-privacy claim, which is what enterprise/defense buyers will pay for.
+
+### Tasks
+
+- [ ] **A1:** verify CORS on `cloud-api.near.ai/v1/chat/completions` from a browser fetch
+- [ ] **A2:** browser-side key vault (localStorage with optional passphrase + WebCrypto AES-GCM wrap)
+- [ ] **A3:** if Starter tier selected, route `/chat` requests to NEAR directly, bypass `/api/chat`
+- [ ] **A4:** update Scanner panel to parse NEAR's attestation fields from the browser response
+- [ ] **A5:** Starter marketing copy upgrade: "Confide servers never see your prompts — verified"
+- [ ] **B1:** fetch NEAR E2EE Chat docs, save into `md/08-e2ee-chat.md`
+- [ ] **B2:** browser-side prompt encryption with NEAR's enclave public key (verify key against attestation first)
+- [ ] **B3:** Pro tier copy upgrade: "End-to-end encrypted to the TEE; Confide proxies only ciphertext"
+- [ ] **B4:** key-rotation handling (refresh enclave key on attestation-cache miss)
+
+### Definition of done
+
+- A `curl` from outside our infrastructure cannot capture a plaintext prompt or reply at any point in the request path for Starter (Option A) or Pro (Option B).
+- Marketing copy in `plans` reflects the new guarantee exactly — no over-claims.
+- A short note in `README.md` explaining the trust model per tier (BYOK vs E2EE vs hosted with proxy).
+
+---
+
+## 11. Playground — Paste-a-Repo, Run It in a TEE
+
+> **Status:** committed feature, post-MVP. The pitch: paste any public GitHub URL, we clone it inside a confidential sandbox VM, and the user can edit / run / chat-with-the-code with every inference going through NEAR's TEE. The repo, prompts, and intermediate outputs never leave the TEE boundary.
+
+### User flow
+
+1. User lands on `/playground`.
+2. Pastes a GitHub repo URL (or picks a template).
+3. We spin up an ephemeral CVM (Intel TDX VM) with that repo cloned.
+4. User sees the file tree on the left, an editor in the middle, a chat/terminal on the right.
+5. Every AI completion routes through NEAR AI Cloud's TEE.
+6. When the session ends, the CVM is destroyed; only the attested receipts are persisted.
+
+```
+┌──────────────────┐     ┌──────────────────────────┐     ┌──────────────────────┐
+│ User             │     │ Confide playground       │     │ NEAR AI Cloud TEE    │
+│  paste URL       │────▶│  /playground             │     │  /v1/chat/completions│
+│  https://github  │     │                          │     │  attested            │
+│  .com/owner/repo │     │  ┌────────────────────┐  │     │                      │
+└──────────────────┘     │  │ Sandbox spawner    │  │     └──────────────────────┘
+                          │  │ Intel TDX CVM      │  │                ▲
+                          │  │ clones repo,       │  │                │
+                          │  │ runs dev server,   │──┼────────────────┘
+                          │  │ exposes editor +   │  │      every prompt routed
+                          │  │ chat + terminal    │  │      through TEE
+                          │  └────────────────────┘  │
+                          └──────────────────────────┘
+```
+
+### What we need to build
+
+**Front-end (`/playground` route):**
+- URL input + "Spin up sandbox" CTA
+- File tree (read from the CVM's filesystem via WebSocket or polling)
+- Monaco editor for inline edits
+- Chat / terminal split panel
+- Live status badge ("Sandbox CVM attested ✓ · 14 min remaining")
+- Session timer + "Destroy sandbox" button
+
+**Back-end (sandbox orchestration):**
+- A spawn API: `POST /api/sandbox` → returns `{ sandboxId, attestation, websocketUrl }`
+- A bridge layer that proxies file IO, terminal commands, and chat requests into the CVM
+- TTL enforcement (default 30 min) + auto-destroy
+
+**Sandbox CVM image (what runs inside the TEE):**
+- Minimal Linux + Node.js + Python + `git`
+- A small Go/Rust agent that:
+  - Clones the GitHub URL on boot
+  - Exposes the workspace over an authenticated WebSocket
+  - Pipes chat prompts to `cloud-api.near.ai` with our key
+  - Emits an attestation report so the front-end can verify the sandbox is genuine before showing any UI
+
+### Open infrastructure questions
+
+- **Who hosts the CVMs?** Options: Phala Network (already TEE-as-a-service), Azure Confidential VMs, GCP Confidential VMs, run our own bare metal with Intel TDX. Phala is cheapest path to MVP.
+- **Network egress from inside the sandbox.** The CVM needs internet to `git clone` and to call NEAR. Locked-down allowlist: `github.com`, `npm`, `pypi`, `cloud-api.near.ai`. Nothing else.
+- **State persistence.** v0: nothing persists; users re-clone every session. v1: encrypted snapshots tied to a user account.
+- **Resource limits.** CPU / RAM / disk caps per sandbox. Idle timeout.
+- **Concurrent sandbox cap per tier.** Starter: 1 active. Pro: 3. Enterprise: 25.
+
+### Trust model
+
+```
+User trusts:  Confide UI shell (small)  +  NEAR TEE  +  Sandbox CVM TEE
+              └────────────────────────────────────────────────────────┘
+                       all verifiable via attestation receipts
+```
+
+- The CVM's TDX quote proves "this is a genuine sandbox image" — verifiable via the same attestation pipeline as the model TEE.
+- The compose-file hash pins the agent binary; we publish source + Sigstore provenance the same way NEAR does for `cloud-api`.
+
+### Pricing impact
+
+- Starter (BYOK): up to 30 min/day sandbox runtime included; over that, fail gracefully.
+- Pro: 10 hr/month sandbox runtime included, then $0.50/hr.
+- Enterprise: 400 hr/seat/month (matches Orgn's hourly model).
+
+### Tasks
+
+- [ ] **P1:** prototype CVM image (Linux + git + Node + the agent) running on Phala
+- [ ] **P2:** spawn API + websocket bridge in our Next.js backend
+- [ ] **P3:** `/playground` front-end with file tree + Monaco editor + chat panel
+- [ ] **P4:** attestation handshake in the browser before showing UI (verifies the sandbox CVM is genuine)
+- [ ] **P5:** session lifecycle: TTL, idle timeout, destroy button, audit log of session attestations
+- [ ] **P6:** egress allowlist (github / npm / pypi / cloud-api.near.ai only)
+- [ ] **P7:** per-tier sandbox concurrency caps
+
+### Definition of done
+
+- User pastes a public GitHub URL, clicks one button, gets a working IDE in <60 seconds.
+- The browser independently verifies the sandbox's TDX quote before unlocking any UI.
+- Every AI completion inside the sandbox shows a NEAR attestation receipt.
+- Closing the tab destroys the CVM within 60 seconds; nothing persists by default.
+
+---
+
+## 12. Open Questions
 
 - **Real attestation shape**: NEAR's exact response fields for TEE attestation aren't visible without an API key. Need to call `/v1/chat/completions` once with a real key to inspect headers/extra fields.
 - **Naming**: `Confide` is placeholder. Real candidates: Sentinel, Vault, Hush, Cipher, Attest.
@@ -174,13 +363,14 @@ Auth: `Authorization: Bearer sk-...` stored in `.env.local`. Never exposed to th
 
 ---
 
-## 11. What's Already Saved
+## 13. What's Already Saved
 
 - `near-ai-cloud-api.md` — full API/auth/model/SLA reference compiled from NEAR docs + Scalar client.
+- `01-quickstart.md` through `07-api-endpoints.md` — NEAR AI Cloud docs captured from the official site.
 
 ---
 
-## 12. Definition of Done (MVP)
+## 14. Definition of Done (MVP)
 
 - [ ] Landing page renders cleanly in dark theme, mobile + desktop.
 - [ ] Chat workspace sends a prompt, gets a real reply from NEAR AI Cloud.
