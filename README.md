@@ -176,6 +176,8 @@ near boom/
 - ✅ Model picker wired to NEAR's real model IDs (Claude Opus 4.7, GLM 5.1, DeepSeek V3.1, GPT-OSS 120B, Qwen3 30B)
 - ✅ Profitable pricing tiers based on NEAR's actual cost-per-million-token math
 - ✅ Full NEAR AI Cloud docs captured in `md/` (quickstart, models, reasoning, private inference, gateway/TLS attestation, complete API endpoint reference)
+- ✅ Hosted brand logos on `/models` for Anthropic, Google, DeepSeek, OpenAI/GPT, Qwen/Alibaba, GLM/Z.ai (Moonshot + Black Forest Labs still on letter-badge fallback)
+- ✅ Silver/white MagicRings WebGL backdrop on the landing final CTA
 - ⏳ Live TEE attestation against a real response (blocked on NEAR account credits — key set but `HTTP 402 no_limit_configured`)
 - ⏳ "Verify receipt" button that calls `/v1/attestation/report` per message
 - ⏳ Local audit log (browser localStorage for receipt history)
