@@ -28,6 +28,8 @@ const DEEPSEEK_LOGO =
   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR8kb3djVaVAlVIpCV7JBbe4lh4uxHfGPk1ow&s";
 const OPENAI_LOGO =
   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQa7aja0wWWohwV3UZsenQQa0mmjeNovFUX9g&s";
+const QWEN_LOGO =
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLuSr6R7xTtmzvDF6-gYI2KQUWQGEqOML4YQ&s";
 
 /** Look up the brand logo for a model creator. */
 export function logoForCreator(creator: string): string {
@@ -36,7 +38,7 @@ export function logoForCreator(creator: string): string {
   if (c.includes("google")) return GOOGLE_LOGO;
   if (c.includes("deepseek")) return DEEPSEEK_LOGO;
   if (c.includes("openai")) return OPENAI_LOGO;
-  if (c.includes("alibaba") || c.includes("qwen")) return makeBadge("Q", "#7C3AED");
+  if (c.includes("alibaba") || c.includes("qwen")) return QWEN_LOGO;
   if (c.includes("z.ai") || c.includes("zai") || c.includes("glm"))
     return makeBadge("Z", "#14B8A6");
   if (c.includes("moonshot") || c.includes("kimi"))
