@@ -260,7 +260,9 @@ browser ──ciphertext──▶ /api/chat ──ciphertext──▶ NEAR E2EE 
 
 ## 11. Playground — Paste-a-Repo, Run It in a TEE
 
-> **Status:** committed feature, post-MVP. The pitch: paste any public GitHub URL, we clone it inside a confidential sandbox VM, and the user can edit / run / chat-with-the-code with every inference going through NEAR's TEE. The repo, prompts, and intermediate outputs never leave the TEE boundary.
+> **Status:** committed feature, post-MVP. Full engineering design lives at **[`md/08-playground-design.md`](./08-playground-design.md)** — it supersedes the sketch below. The sketch is kept for context; the design doc is the source of truth.
+
+> The pitch: paste any public GitHub URL, we clone it inside a confidential sandbox VM, and the user can edit / run / chat-with-the-code with every inference going through NEAR's TEE. The repo, prompts, and intermediate outputs never leave the TEE boundary.
 
 ### User flow
 
