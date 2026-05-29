@@ -30,6 +30,8 @@ const OPENAI_LOGO =
   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQa7aja0wWWohwV3UZsenQQa0mmjeNovFUX9g&s";
 const QWEN_LOGO =
   "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLuSr6R7xTtmzvDF6-gYI2KQUWQGEqOML4YQ&s";
+const GLM_LOGO =
+  "https://static.vecteezy.com/system/resources/previews/009/132/003/non_2x/llm-letter-logo-design-with-polygon-shape-llm-polygon-and-cube-shape-logo-design-llm-hexagon-logo-template-white-and-black-colors-llm-monogram-business-and-real-estate-logo-vector.jpg";
 
 /** Look up the brand logo for a model creator. */
 export function logoForCreator(creator: string): string {
@@ -40,7 +42,7 @@ export function logoForCreator(creator: string): string {
   if (c.includes("openai")) return OPENAI_LOGO;
   if (c.includes("alibaba") || c.includes("qwen")) return QWEN_LOGO;
   if (c.includes("z.ai") || c.includes("zai") || c.includes("glm"))
-    return makeBadge("Z", "#14B8A6");
+    return GLM_LOGO;
   if (c.includes("moonshot") || c.includes("kimi"))
     return makeBadge("K", "#0F172A", "#E2E8F0");
   if (c.includes("black forest") || c.includes("flux")) return makeBadge("F", "#1F2937");
