@@ -4,6 +4,7 @@ import { Reveal } from "./components/ui/reveal";
 import { AnimatedWave } from "./components/ui/animated-wave";
 import { MetricsSection } from "./components/ui/metrics-section";
 import { PoweredBy } from "./components/ui/powered-by";
+import MagicRings from "./components/ui/magic-rings";
 
 const steps = [
   {
@@ -374,23 +375,49 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Final CTA — black, square */}
+      {/* Final CTA — black, square, with MagicRings backdrop */}
       <section className="bg-black px-4 pb-28 text-white sm:px-6 sm:pb-40">
         <Reveal className="mx-auto max-w-5xl">
-          <div className="border border-neutral-900 bg-neutral-950 px-6 py-20 text-center sm:px-12 sm:py-28">
-            <h2 className="text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl lg:text-7xl">
-              Stop trusting. <span className="font-serif font-normal italic">Start</span>{" "}
-              verifying.
-            </h2>
-            <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-400">
-              Open the IDE, write a prompt, and watch the attestation receipt land beside it.
-            </p>
-            <Link
-              href="/chat"
-              className="mt-10 inline-block rounded-full bg-white px-9 py-4 text-sm font-semibold text-black transition hover:bg-neutral-200"
-            >
-              Open the IDE
-            </Link>
+          <div className="relative overflow-hidden bg-black px-6 py-20 text-center sm:px-12 sm:py-28">
+            <div className="pointer-events-none absolute inset-0">
+              <MagicRings
+                color="#A855F7"
+                colorTwo="#6366F1"
+                ringCount={6}
+                speed={1}
+                attenuation={10}
+                lineThickness={2}
+                baseRadius={0.35}
+                radiusStep={0.1}
+                scaleRate={0.1}
+                opacity={1}
+                noiseAmount={0.1}
+                rotation={0}
+                ringGap={1.5}
+                fadeIn={0.7}
+                fadeOut={0.5}
+                followMouse={false}
+                mouseInfluence={0.2}
+                hoverScale={1.2}
+                parallax={0.05}
+                clickBurst={false}
+              />
+            </div>
+            <div className="relative z-10">
+              <h2 className="text-balance text-3xl font-semibold leading-[1.05] tracking-tight sm:text-5xl sm:leading-[1.0] md:text-6xl lg:text-7xl">
+                Stop trusting.{" "}
+                <span className="font-serif font-normal italic">Start</span> verifying.
+              </h2>
+              <p className="mx-auto mt-6 max-w-lg text-lg text-neutral-300">
+                Open the IDE, write a prompt, and watch the attestation receipt land beside it.
+              </p>
+              <Link
+                href="/chat"
+                className="mt-10 inline-block rounded-full bg-white px-9 py-4 text-sm font-semibold text-black transition hover:bg-neutral-200"
+              >
+                Open the IDE
+              </Link>
+            </div>
           </div>
         </Reveal>
       </section>

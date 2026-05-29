@@ -186,7 +186,8 @@ function ModelRow({ m }: { m: NearModel }) {
           src={logoForCreator(m.creator)}
           alt=""
           aria-hidden="true"
-          className="h-9 w-9 shrink-0"
+          className="h-9 w-9 shrink-0 rounded-md bg-neutral-900 object-cover"
+          loading="lazy"
         />
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-white">{m.modelName}</p>

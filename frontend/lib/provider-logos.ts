@@ -19,13 +19,21 @@ export const PROVIDER_LOGOS = [
 
 export const PROVIDER_LOGO_URLS = PROVIDER_LOGOS.map((p) => p.url);
 
+/** Hosted brand logos for the providers we have real artwork for. */
+const ANTHROPIC_LOGO =
+  "https://media.licdn.com/dms/image/v2/D4E0BAQFko-zWIZk_pw/company-logo_200_200/B4EZhiRWKvHgAI-/0/1753995371543/claude_logo?e=2147483647&v=beta&t=CVNmFKyWig0Uo78oAr3II6KVLu_o0aXPtnt4S6XgOr8";
+const GOOGLE_LOGO =
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSYCSbajNbQ_pkt_MNnumy90HxSCt06M_BYA&s";
+const DEEPSEEK_LOGO =
+  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR8kb3djVaVAlVIpCV7JBbe4lh4uxHfGPk1ow&s";
+
 /** Look up the brand logo for a model creator. */
 export function logoForCreator(creator: string): string {
   const c = creator.toLowerCase();
+  if (c.includes("anthropic")) return ANTHROPIC_LOGO;
+  if (c.includes("google")) return GOOGLE_LOGO;
+  if (c.includes("deepseek")) return DEEPSEEK_LOGO;
   if (c.includes("openai")) return makeBadge("O", "#10A37F");
-  if (c.includes("anthropic")) return makeBadge("A", "#D97757");
-  if (c.includes("google")) return makeBadge("G", "#4285F4");
-  if (c.includes("deepseek")) return makeBadge("D", "#4D6BFE");
   if (c.includes("alibaba") || c.includes("qwen")) return makeBadge("Q", "#7C3AED");
   if (c.includes("z.ai") || c.includes("zai") || c.includes("glm"))
     return makeBadge("Z", "#14B8A6");
