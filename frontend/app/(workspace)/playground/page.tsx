@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { TopBar } from "@/app/components/workspace/TopBar";
 import { api, type GithubRepo, type MeResponse, type SandboxSession } from "@/lib/api";
+import { SandboxView } from "./SandboxView";
 
 export default function PlaygroundPage() {
   return (
@@ -222,13 +223,13 @@ function PlaygroundInner() {
             </div>
           </section>
 
-          {/* Sandbox status */}
-          {session && (
+          {/* Sandbox status — until ready */}
+          {session && session.status !== "ready" && (
             <section className="mt-10 border border-emerald-900/40 bg-emerald-950/10 p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-300">
-                    Sandbox status
+                    Provisioning sandbox
                   </h2>
                   <p className="mt-1 font-mono text-[0.65rem] text-neutral-500">
                     {session.id} · {session.repoUrl}
@@ -242,49 +243,70 @@ function PlaygroundInner() {
                   }}
                   className="border border-neutral-800 px-3 py-1 text-[0.65rem] uppercase tracking-widest text-neutral-400 transition hover:border-neutral-600 hover:text-white"
                 >
-                  Destroy
+                  Cancel
                 </button>
               </div>
               <div className="mt-4 space-y-2 text-xs">
                 <Step label="Repository URL accepted" done />
                 <Step
-                  label="Spawning confidential VM (Intel TDX)…"
-                  done={["cloning", "ready"].includes(session.status)}
+                  label="Provisioning workspace"
+                  done={session.status === "cloning"}
                   active={session.status === "spawning"}
                 />
                 <Step
-                  label="Cloning repository inside the enclave"
-                  done={session.status === "ready"}
+                  label={`git clone --depth=1 ${session.repoUrl}`}
                   active={session.status === "cloning"}
-                />
-                <Step
-                  label="Attestation handshake"
-                  done={session.status === "ready"}
-                  active={session.status === "ready" && !session.attestation?.verified}
-                  pending={session.status !== "ready"}
+                  pending={session.status === "queued" || session.status === "spawning"}
                 />
               </div>
               {session.error && (
                 <p className="mt-3 text-xs text-red-400">{session.error}</p>
               )}
-              <p className="mt-4 text-[0.65rem] text-neutral-500">
-                The real CVM spawn is documented in md/08-playground-design.md.
-                This sandbox is a mock today — the spawn API just simulates the
-                state transitions so the UI is testable.
-              </p>
             </section>
           )}
 
-          {/* Trust note */}
+          {/* Ready — render the actual editor + terminal */}
+          {session && session.status === "ready" && (
+            <SandboxView
+              sandboxId={session.id}
+              repoUrl={session.repoUrl}
+              onDestroy={() => {
+                void api.destroySandbox(session.id);
+                setSession(null);
+              }}
+            />
+          )}
+
+          {/* Trust note — honest about what's real today */}
           <section className="mt-10 mb-12 border border-neutral-900 bg-neutral-950 p-6">
             <h2 className="text-sm font-medium uppercase tracking-[0.2em] text-neutral-500">
-              How the sandbox protects you
+              What the sandbox actually does today
             </h2>
             <ul className="mt-4 space-y-2 text-sm text-neutral-300">
-              <li>• The repository is cloned inside an Intel TDX confidential VM.</li>
-              <li>• The browser verifies the VM&apos;s TDX quote before unlocking the editor.</li>
-              <li>• Every AI completion is routed through NEAR&apos;s TEE with a signed receipt.</li>
-              <li>• Closing the tab destroys the VM within 60 seconds. Nothing persists by default.</li>
+              <li>
+                <span className="mr-2 text-emerald-400">✓</span>
+                Repository is git-cloned into a per-sandbox, path-jailed workspace. Other sandboxes cannot touch its files.
+              </li>
+              <li>
+                <span className="mr-2 text-emerald-400">✓</span>
+                Every AI completion called from inside the workspace routes through NEAR&apos;s TEE — signed attestation receipt per reply.
+              </li>
+              <li>
+                <span className="mr-2 text-emerald-400">✓</span>
+                Closing the tab or hitting Destroy wipes the workspace from disk within seconds. No backups, no residue.
+              </li>
+              <li>
+                <span className="mr-2 text-amber-400">○</span>
+                Intel TDX CVM hosting is in progress. Until NEAR opens a CVM offering (or we partner to host on their nodes), the workspace runs on a sandboxed backend dir — real isolation, no TDX attestation yet. See{" "}
+                <Link
+                  href="https://github.com/ayushsingh82/Confide/blob/main/md/plan.md"
+                  className="text-neutral-100 underline-offset-2 hover:underline"
+                  target="_blank"
+                >
+                  plan §12
+                </Link>
+                .
+              </li>
             </ul>
             <p className="mt-4 text-xs text-neutral-500">
               <Link href="/chat" className="text-neutral-300 underline-offset-2 hover:underline">

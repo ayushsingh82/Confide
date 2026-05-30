@@ -3,5 +3,6 @@ dist/
 .env
 .env.local
 data/*.jsonl
+data/sandboxes/
 *.log
 .DS_Store

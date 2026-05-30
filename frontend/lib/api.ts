@@ -133,4 +133,59 @@ export const api = {
       credentials: "include",
     }).then(() => undefined);
   },
+  sandboxTree(id: string): Promise<{ tree: SandboxTreeNode }> {
+    return apiFetch(`/v1/sandbox/${encodeURIComponent(id)}/tree`);
+  },
+  readSandboxFile(
+    id: string,
+    path: string
+  ): Promise<{ path: string; contents: string; size: number; truncated: boolean }> {
+    const params = new URLSearchParams({ path });
+    return apiFetch(`/v1/sandbox/${encodeURIComponent(id)}/file?${params}`);
+  },
+  writeSandboxFile(
+    id: string,
+    path: string,
+    contents: string
+  ): Promise<{ path: string; size: number }> {
+    return apiFetch(`/v1/sandbox/${encodeURIComponent(id)}/file`, {
+      method: "PUT",
+      body: JSON.stringify({ path, contents }),
+    });
+  },
+  exec(
+    id: string,
+    cmd: string,
+    args: string[] = [],
+    opts: { cwd?: string; timeoutMs?: number } = {}
+  ): Promise<SandboxExecResult> {
+    const body: Record<string, unknown> = { cmd, args };
+    if (opts.cwd) body.cwd = opts.cwd;
+    if (opts.timeoutMs) body.timeoutMs = opts.timeoutMs;
+    return apiFetch(`/v1/sandbox/${encodeURIComponent(id)}/exec`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
 };
+
+export interface SandboxTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+  size?: number;
+  children?: SandboxTreeNode[];
+}
+
+export interface SandboxExecResult {
+  cmd: string;
+  args: string[];
+  exitCode: number | null;
+  signal: string | null;
+  durationMs: number;
+  stdout: string;
+  stderr: string;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+  timedOut: boolean;
+}
