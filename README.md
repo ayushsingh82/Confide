@@ -15,11 +15,21 @@ Built on the open NEAR AI stack.
 
 | Surface | Status | Description |
 |---|---|---|
-| **Landing page** | ✅ shipped | Dark-themed marketing site — hero, how-it-works, features, metrics, pricing, CTA, footer |
-| **`/chat` workspace** | ⏳ next | Two-pane IDE preview: chat on the left, live Scanner (attestation receipts) on the right |
-| **`/api/chat`** | ⏳ next | Server-side proxy that holds the NEAR API key and forwards prompts to `/v1/chat/completions` |
-| **Audit log** | ⏳ next | Per-message receipt history (browser-local for v0) |
-| **Pricing / Stripe** | later | Marketing copy only for MVP |
+| **Landing page** | ✅ shipped | Dark marketing site — hero w/ NEAR pill, features, metrics, pricing tiers w/ real margins, silver MagicRings CTA, footer |
+| **Workspace shell** | ✅ shipped | Left sidebar (Chat / Playground / Browse Models / Usage / Settings) + top bar with profile menu + "NEAR TEE connected" badge |
+| **`/chat` workspace** | ✅ shipped | Chat panel + live Scanner panel; per-message attestation receipts (model, TEE, hash, latency, tokens); 5-model picker with real NEAR IDs |
+| **`/playground`** | ✅ shipped (mock CVM) | Paste GitHub URL → spawn confidential sandbox. Status pane stepper; trust-model explainer; real Phala/Azure spawn is P1 |
+| **`/browse-models`** | ✅ shipped | NEAR-only catalog (40 models) with real provider logos for Anthropic / Google / DeepSeek / OpenAI / Qwen / GLM; search + category + creator filters |
+| **`/usage`** | ✅ shipped | Square stat grid (Agent Runs / Sessions / Tokens / USD) backed by per-request UsageEvent log; time-range tabs; per-day bar chart; per-model leaderboard |
+| **`/settings/profile`** | ✅ shipped | Avatar, linked emails with Primary/OAuth/Verified pills, danger zone |
+| **GitHub OAuth** | ✅ shipped | Connect GitHub from `/playground`, browse your repos, one-click import to spawn a sandbox. End users never see secrets — see [md/09-github-oauth.md](./md/09-github-oauth.md) |
+| **Backend service** | ✅ shipped | Fastify on `:4000` — `/v1/chat` (NEAR proxy), `/v1/usage/*`, `/v1/models`, `/v1/attestation/report`, `/v1/sandbox/*`, `/v1/auth/github/*`, `/v1/github/repos` |
+| **Token usage tracking** | ✅ shipped | Backend appends `UsageEvent` per chat to `data/usage.jsonl`; cost computed from NEAR per-million pricing; `/usage/summary` returns totals + by-day + leaderboard in one call |
+| **Real CVM spawn (Phala adapter)** | ⏳ next | Replace the mock spawn with real TDX VMs — see [md/08-playground-design.md](./md/08-playground-design.md) phased plan |
+| **In-VM editor + terminal** | ⏳ next | Monaco editor + xterm.js terminal in browser, WS bridge to `confide-agent` Go binary inside the CVM |
+| **Frontend → backend chat handoff** | ⏳ next | One-file change: point `frontend/app/api/chat/route.ts` at `backend:4000/v1/chat` so usage events persist to disk |
+| **Privacy upgrade (E2EE / BYOK direct)** | later | Cut Confide's proxy out of the plaintext path — see [md/plan.md §10](./md/plan.md) |
+| **Pricing / Stripe** | later | Marketing copy only; pricing math is in the landing tiers |
 | **VS Code extension** | later | Real CDE clone after the web IDE is solid |
 
 ---
