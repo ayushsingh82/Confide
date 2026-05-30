@@ -28,6 +28,18 @@ export const config = {
   nearApiBase: readString("NEAR_API_BASE", "https://cloud-api.near.ai"),
   corsOrigin: readString("CORS_ORIGIN", "http://localhost:3000"),
   dataDir: path.resolve(readString("DATA_DIR", "./data")),
+
+  // GitHub OAuth — empty strings disable the auth routes gracefully.
+  githubClientId: process.env.GITHUB_CLIENT_ID ?? "",
+  githubClientSecret: process.env.GITHUB_CLIENT_SECRET ?? "",
+  publicBackendUrl: readString("PUBLIC_BACKEND_URL", "http://localhost:4000"),
+  publicFrontendUrl: readString("PUBLIC_FRONTEND_URL", "http://localhost:3000"),
+  sessionSecret: readString(
+    "SESSION_SECRET",
+    "dev-only-session-secret-change-me"
+  ),
 } as const;
 
 export const hasNearKey = config.nearApiKey.length > 0;
+export const hasGithubOAuth =
+  config.githubClientId.length > 0 && config.githubClientSecret.length > 0;
