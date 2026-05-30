@@ -358,7 +358,11 @@ User trusts:  Confide UI shell (small)  +  NEAR TEE  +  Sandbox CVM TEE
 
 ## 12. From Mock Spawn → Real VM — Built on NEAR's Stack
 
-> Today: `/playground` shows a mock sandbox stepper after Import. We need the user to *actually* edit and run the code inside a TEE. This section lays out exactly how — and importantly, **using NEAR's own confidential infrastructure** rather than a third-party host.
+> **Status update (commit cd4bde8):** the local sandbox layer is *shipped*. Paste a GitHub URL → real `git clone`, real file tree, real editor with save, real exec with output. Full how-it-was-built doc at [`md/10-sandbox-implementation.md`](./10-sandbox-implementation.md).
+>
+> What's still pending: TDX CVM hosting (the two trust-model claims about "Intel TDX confidential VM" + "browser verifies the TDX quote"). The path to closing those is below — and the user-facing copy on `/playground` is already honest about which lines are ✅ vs ○ until then.
+
+> Original ask: the user wanted to *actually* edit and run the code inside a TEE. This section lays out exactly how — **using NEAR's own confidential infrastructure** rather than a third-party host.
 
 ### Why NEAR (not Phala/Azure directly)
 
@@ -447,21 +451,26 @@ The bridge protocol is already specified in `md/08-playground-design.md §5` —
 
 ### Order of operations to ship
 
-| Step | What | Estimated time | Blocking? |
+| Step | What | Estimated | Status |
 |---|---|---|---|
-| 1 | Write `cvm/Dockerfile` + `cvm/agent/main.go` (TLS bind, WS server skeleton, attest stub) | 1 day | No |
-| 2 | Set up GitHub Actions to build + push `confide-cvm` image to GHCR with Sigstore signing | 0.5 day | No |
-| 3 | Implement `backend/src/lib/cvm-provider.ts` interface + `MockProvider` (drop-in replacement for current mock) | 2 hr | No |
-| 4 | Implement `PhalaProvider` against Phala Cloud SDK (`@phala/dstack`) | 1 day | Phala API credentials (free tier exists) |
-| 5 | Implement `backend/src/lib/dcap.ts` with `dcap-qvl` Node bindings | 0.5 day | No |
-| 6 | Wire `dcap.verifyQuote` into `/v1/sandbox` to gate the JWT release | 2 hr | Step 5 |
-| 7 | Add `chat.complete` handler to `confide-agent` (Go) — forwards to NEAR with leased JWT | 0.5 day | NEAR credits unblocked |
-| 8 | Frontend: `SandboxBridge` + `FileTree` + `Editor` (Monaco) | 1 day | No |
-| 9 | Frontend: `Terminal` (xterm.js) + `RunButtons` | 0.5 day | No |
-| 10 | Frontend: `ChatPanel` reusing the existing chat workspace components | 2 hr | No |
-| 11 | E2E test: paste real repo URL, see it clone, edit `package.json`, run `npm install`, chat with the code | — | Steps 1–10 |
+| 1 | Backend FS jail + exec runner + git clone in `sandbox-store.ts` | 0.5 day | ✅ shipped (cd4bde8) |
+| 2 | Backend routes for tree / file IO / exec (zod-validated) | 0.5 day | ✅ shipped (cd4bde8) |
+| 3 | Frontend `SandboxView` — three-pane file tree + editor + run buttons + output | 0.5 day | ✅ shipped (cd4bde8) |
+| 4 | Honest trust copy on `/playground` (replace overstated TDX claims) | 0.1 day | ✅ shipped (cd4bde8) |
+| 5 | Documentation: `md/10-sandbox-implementation.md` (how-it-was-built source of truth) | 0.2 day | ✅ shipped |
+| — | — *(line below this is gated on NEAR CVM hosting)* — | — | — |
+| 6 | Write `cvm/Dockerfile` + `cvm/agent/main.go` (TLS bind, WS server skeleton, attest stub) | 1 day | ⏳ pending NEAR CVM host |
+| 7 | GitHub Actions: build + push `confide-cvm` to GHCR with Sigstore signing | 0.5 day | ⏳ |
+| 8 | Extract `sandbox-store.ts` into `cvm-providers/local.ts` + write `cvm-providers/near.ts` | 0.5 day | ⏳ |
+| 9 | `backend/src/lib/dcap.ts` — `dcap-qvl` Node bindings, gate JWT release | 0.5 day | ⏳ |
+| 10 | Browser-side re-verification of the TDX quote over the WS before unlocking the editor | 0.5 day | ⏳ |
+| 11 | Replace textarea with Monaco; replace buffered exec with WS pty bridge | 1 day | ⏳ |
+| 12 | `ChatPanel` inside SandboxView routed through the CVM agent (NEAR key never touches Confide proxy) | 0.5 day | ⏳ NEAR credits |
+| 13 | Egress allowlist enforced inside the CVM image (iptables OUTPUT) | 0.5 day | ⏳ |
 
-**Realistic ship date for a usable in-browser TEE-attested IDE: 5–7 working days from "go".** Two of those depend on external unlocks: Phala credentials (free, fast) and NEAR credits (in progress per the credit conversation).
+**Shipped so far: 1.8 days of work covering steps 1–5.** Everything from step 6 onward is gated on the NEAR partnership — see §13.
+
+The trust truth-table flips its last two rows from ❌ to ✅ at step 9. The user-facing copy on `/playground` is already written to handle that transition: today it shows `○ Intel TDX CVM hosting is in progress`; the moment step 9 ships, that line becomes `✓` and no other copy change is needed.
 
 ### What we can ship before NEAR credits unblock
 
@@ -486,7 +495,88 @@ These come straight from `md/08-playground-design.md §15` and apply to every sh
 
 ---
 
-## 13. Open Questions
+## 13. NEAR Partnership — Three-Phase Ask Plan
+
+> Context: NEAR doesn't expose a generic "spawn me a CVM" product publicly today. To make the last two trust-model rows turn ✅, we need NEAR to host our `confide-cvm` image on their Private LLM Nodes (or open a CVM product we can self-serve). This section sequences the three asks so the small credits ask in flight doesn't get muddled with the bigger partnership ask.
+
+### The two distinct asks
+
+| Ask | Size | Who decides | When |
+|---|---|---|---|
+| **A. Credits** — ~$100/month to run end-to-end against `cloud-api.near.ai` | Small | DevRel discretionary | Now (in flight) |
+| **B. CVM hosting** — host `confide-cvm@sha256:…` on a NEAR Private LLM Node so playground sandboxes run inside a NEAR-attested TDX VM | Large | Infra / partnerships team | Several weeks from now |
+
+The mistake to avoid: bundling both into one message. **Close out A first. Use the time between A and B to ship the demo video. Make B with usage data in hand.**
+
+### Phase 1 — Close out the credits ask (this week)
+
+Stay in the current TG thread. Don't mention CVM hosting yet. Once they confirm:
+
+> Thanks sir, will share usage as I run. One follow-up I'll loop back on in a couple weeks once I have real receipts — there's a bigger collab idea I'd love to explore when Confide is running against your TEE.
+
+That parks the bigger ask without scaring them off the small one.
+
+### Phase 2 — Ship the demo (next 24–48h after credits land)
+
+Goal: a 60–90s screen recording showing
+1. Workspace + sandbox + browse models
+2. A real chat completion with the attestation receipt rendered live
+3. The `○ Intel TDX CVM hosting in progress` line on `/playground` — this is the asynchronous pitch. They'll read it and think "wait, they want to host on us?" without us having to ask.
+
+Post the video on X, tag the credits-helper, link the repo. Phase 3 starts when they see it.
+
+### Phase 3 — The CVM ask (1–2 weeks later, with real usage data)
+
+Send a separate, more formal message — not in the DM thread, but to the same person asking to be forwarded. **One-pager attached, not a wall of text.**
+
+Template:
+
+> Sir, would love a few minutes when convenient.
+>
+> Quick context: Confide has been running on NEAR AI Cloud for ~2 weeks. Real usage: [N completions, ~$Y spent, M users from launch tweet]. Repo + demo: [links].
+>
+> The pitch: there's a piece of the trust story we can't deliver without NEAR's help — the playground's "in-TEE code execution" claim. Today the sandbox runs on our backend (honest about it on the page). To make it true end-to-end on NEAR's stack, we'd need NEAR to host our CVM image (`confide-cvm`) on a TDX node — same publishing pattern as `nearaidev/cloud-api`, same `dcap-qvl` verifier, signed via Sigstore.
+>
+> Upside for NEAR: a third-party verifiable case study of the stack used for general-purpose confidential compute, not just inference. Builder-led co-marketing material.
+>
+> I have the CVM image, agent protocol, and attestation handshake all designed (links to md/08 + md/10). If there's anyone on the infra team I should talk to, happy to write up a one-pager + run a 20-minute walkthrough.
+
+### What we can ship in parallel while the partnership conversation moves
+
+| Build | Phase 3 evidence it generates |
+|---|---|
+| Frontend → backend chat handoff (one-file change) | Every chat completion logs a `UsageEvent` to `data/usage.jsonl` — becomes the "N completions, $Y spent" hard number |
+| Real attestation receipt rendered live in the SandboxView (no fakes — light only when a real receipt comes back) | The demo video has a concrete "see, the attestation is real" moment |
+| Browser-side verification of the gateway TDX quote (using the dcap-qvl recipe in `md/06-tls-attestation.md`) | The pitch is "we already implemented your verifier" — they're not granting trust, they're inheriting it |
+| One-pager for Phase 3 (PDF or md) | The thing the partnerships team forwards internally |
+
+### What NEAR gets out of saying yes
+
+This is the underrated part of the pitch — what's in it for them. Three specific things to lead with in the Phase 3 message:
+
+1. **General-purpose confidential compute case study.** Right now NEAR's TEE story is "we run models in TDX." Hosting a third-party sandbox image is the first proof that the same infrastructure can run *anyone's* code with the same trust guarantees. That's a wedge into a much bigger market than inference.
+2. **A verifiable customer.** Most builder stories are "X integrated NEAR" — vague. This one is "X's customers cryptographically verify they're running inside NEAR TDX, every session." That's a quote NEAR can put on their site.
+3. **Reproducible reference architecture.** Our CVM image + agent + `dcap-qvl` verifier becomes the template the next builder forks. NEAR ships one partnership, gets ten downstream.
+
+### What we will NOT ask for
+
+Important to be clear about, since the conversation is going to come up:
+
+- We do not ask for free hosting indefinitely. The ask is for a 1–3 month pilot on a single CVM, in exchange for the case study artifacts.
+- We do not ask for a custom image build pipeline. Our build → push → Sigstore-sign flow is the same as `nearaidev/cloud-api` — they don't have to invent anything.
+- We do not ask to be on their critical path. If the CVM goes down, our playground falls back to the local sandbox we already shipped. The user just sees the `○` indicator instead of `✓`.
+
+### Definition of done for Phase 3
+
+- A `confide-cvm@sha256:…` image runs on NEAR-hosted infra.
+- `GET /v1/attestation/report` against that CVM returns a TDX quote whose `mr_config_id` matches `SHA256(our_compose_file)`.
+- `backend/src/lib/dcap.ts` verifies it, mints a session JWT, the browser unlocks the editor.
+- The `/playground` page's last `○` becomes `✓` and the marketing copy is fully defensible end-to-end.
+- A joint post-mortem-style writeup goes up on both nearblog and our blog.
+
+---
+
+## 14. Open Questions
 
 - **Real attestation shape**: NEAR's exact response fields for TEE attestation aren't visible without an API key. Need to call `/v1/chat/completions` once with a real key to inspect headers/extra fields.
 - **Naming**: `Confide` is placeholder. Real candidates: Sentinel, Vault, Hush, Cipher, Attest.
@@ -495,14 +585,14 @@ These come straight from `md/08-playground-design.md §15` and apply to every sh
 
 ---
 
-## 14. What's Already Saved
+## 15. What's Already Saved
 
 - `near-ai-cloud-api.md` — full API/auth/model/SLA reference compiled from NEAR docs + Scalar client.
 - `01-quickstart.md` through `07-api-endpoints.md` — NEAR AI Cloud docs captured from the official site.
 
 ---
 
-## 15. Definition of Done (MVP)
+## 16. Definition of Done (MVP)
 
 - [ ] Landing page renders cleanly in dark theme, mobile + desktop.
 - [ ] Chat workspace sends a prompt, gets a real reply from NEAR AI Cloud.

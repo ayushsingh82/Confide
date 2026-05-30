@@ -269,15 +269,18 @@ The current stubs return mock state; the real implementations wrap a Phala SDK a
 
 ## 11. Phased Build Plan
 
+> **Update (commit cd4bde8 + c160e05):** P0 + a "local hardware" variant of P2/P3 shipped together as a working playground (real git clone, real file IO, real exec, real editor + terminal in browser). The host is the backend filesystem, not a TDX CVM — the trust truth-table flips when steps P1 + dcap verification land. Source-of-truth doc: [`md/10-sandbox-implementation.md`](./10-sandbox-implementation.md).
+
 | Phase | Scope | Status |
 |---|---|---|
-| **P0** | UI placeholder at `/playground` (paste URL + status stepper), mock spawn API, plan committed | ✅ shipped |
-| **P1** | Phala SDK adapter, real CVM provisioning, backend dcap-qvl verification, signed JWT | ⏳ next |
-| **P2** | WS bridge protocol implemented in `confide-agent` (Go), file tree + Monaco editor in the browser | ⏳ |
-| **P3** | Terminal multiplexing (xterm.js + pty) + run buttons (`npm install`, `python main.py`, …) | ⏳ |
-| **P4** | Chat panel inside playground — `chat.complete` over the WS, receipts shown in the right rail | ⏳ |
-| **P5** | Egress allowlist enforced in CVM image, audit log written to `data/sandboxes.jsonl` | ⏳ |
-| **P6** | State persistence v1 (encrypted snapshots) | ⏳ |
+| **P0** | UI placeholder at `/playground` (paste URL + status stepper), spawn API + plan committed | ✅ shipped |
+| **P2/P3** (local-hardware variant) | Real `git clone`, file tree, textarea editor with Cmd/Ctrl+S save, run buttons + free-form exec, output panel with stdout/stderr/exit/duration/truncation. Backend = path-jailed dir; not yet attested. | ✅ shipped (cd4bde8) |
+| **P1** | NEAR-hosted CVM provisioning (via partnership — see [`plan.md §13`](./plan.md)), `cvm-providers/near.ts` adapter, backend `dcap-qvl` verification, signed JWT bound to sessionId+SPKI | ⏳ pending NEAR partnership |
+| **P2 (CVM variant)** | Re-host the shipped file/edit/exec layer inside the CVM via `confide-agent` Go binary + WS bridge; replace textarea with Monaco | ⏳ pending P1 |
+| **P3 (CVM variant)** | xterm.js + pty multiplexing inside the agent — replaces buffered exec with live streamed terminal | ⏳ pending P1 |
+| **P4** | Chat panel inside playground — `chat.complete` over the WS, receipts in the right rail, NEAR key leased to agent per session | ⏳ pending P1 + NEAR credits |
+| **P5** | Egress allowlist enforced inside CVM image (iptables OUTPUT DROP + 8-host allowlist), audit log written to `data/sandboxes.jsonl` | ⏳ pending P1 |
+| **P6** | State persistence v1 (encrypted snapshots, key derived from user + TEE-sealed secret) | ⏳ |
 | **P7** | Collaborative editing v2 (Y.js inside agent) | ⏳ |
 
 ---
@@ -353,5 +356,8 @@ frontend/
 
 - `04-private-inference.md` — how NEAR's TEE works under the hood
 - `06-tls-attestation.md` — the verification recipe we mirror for the CVM
+- `10-sandbox-implementation.md` — **what's actually shipped today** (this doc is the future state; that doc is the present)
 - `plan.md §10` — privacy upgrade for browser-direct chat (separate from playground)
 - `plan.md §11` — original playground sketch, now superseded by this doc
+- `plan.md §12` — implementation status table (which phases above have shipped)
+- `plan.md §13` — three-phase NEAR partnership ask plan (how we unblock everything `⏳` above)
