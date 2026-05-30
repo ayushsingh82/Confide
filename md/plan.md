@@ -356,7 +356,137 @@ User trusts:  Confide UI shell (small)  +  NEAR TEE  +  Sandbox CVM TEE
 
 ---
 
-## 12. Open Questions
+## 12. From Mock Spawn → Real VM — Built on NEAR's Stack
+
+> Today: `/playground` shows a mock sandbox stepper after Import. We need the user to *actually* edit and run the code inside a TEE. This section lays out exactly how — and importantly, **using NEAR's own confidential infrastructure** rather than a third-party host.
+
+### Why NEAR (not Phala/Azure directly)
+
+Earlier drafts assumed Phala Cloud as the CVM host. Reconsidered — sticking with NEAR's stack end-to-end is the right call:
+
+1. **Single trust story.** Users already verify NEAR's Intel TDX + H100 attestation receipts for chat completions. Reusing the same TDX + dcap-qvl pipeline for the sandbox means **one attestation surface** to audit, not two.
+2. **Same SDK + same image-attestation flow.** NEAR publishes `nearaidev/cloud-api` with Sigstore provenance and a pinned compose file hash (`md/05-gateway-verification.md`). Our `confide-cvm` image follows the same publishing pattern.
+3. **Marketing line stays clean** — "every part of the flow runs in a NEAR TEE", not "chat runs in NEAR, sandbox runs in Phala".
+4. **Path to a NEAR co-marketing case.** If we ship on their stack, they have a concrete reason to feature us. (Aligned with the credit conversation already happening with their team.)
+
+NEAR doesn't currently expose a *general-purpose* "spawn me a CVM" endpoint — their TEEs run their own model images. So the path is two-phased:
+
+- **Phase 1 — Use what NEAR has now:** the `/v1/attestation/report` endpoint + the Private-ML-SDK image-publishing flow. We deploy `confide-cvm` images to a CVM-hosting layer that exposes the same attestation surface (Phala TDX nodes today, NEAR-hosted CVMs once they open them up — same code path on our side).
+- **Phase 2 — Migrate to NEAR-hosted CVMs:** once NEAR opens a "host my CVM" product (or we partner with them to host `confide-cvm` images on NEAR Private LLM Nodes), we flip a single env var. The browser flow, attestation handshake, agent protocol — all unchanged.
+
+This means the design in `md/08-playground-design.md` is still correct end-to-end; the only thing that changes is **which TDX provider boots the CVM**. The user-facing attestation receipt is identical either way (it's the TDX quote — same hardware, same `dcap-qvl` verifier).
+
+### Implementation order
+
+#### A. The CVM image (one-time, then reusable)
+
+| File | Contents |
+|---|---|
+| `cvm/Dockerfile` | `debian:12-slim` + Node 22 + Python 3.12 + Go 1.23 + cargo + git + curl + ripgrep + the `confide-agent` Go binary |
+| `cvm/docker-compose.yml` | Single-service compose so the SHA256 of this file becomes the `mr_config_id` bound into the TDX quote (mirrors how `nearaidev/cloud-api` does it) |
+| `cvm/agent/` | Go module — `main.go`, `tls.go` (self-signed cert at boot, SPKI bound into the TDX quote), `attest.go` (read TDX quote via `/dev/tdx-attest`), `ws.go` (multiplexed WS server), `fs.go` (file IO jailed to `/workspace`), `pty.go` (pty multiplexer), `chat.go` (NEAR forwarder using a leased JWT) |
+| `.github/workflows/cvm-image.yml` | Build + push to `ghcr.io/ayushsingh82/confide-cvm@sha256:...` with Sigstore signing (`cosign`) |
+
+The publishing flow is the same `mr_config_id = SHA256(app_compose)` + Sigstore provenance pattern documented in `md/05-gateway-verification.md` and `md/06-tls-attestation.md`. **We're not inventing a verification model — we're copying NEAR's exactly so our attestation receipts validate with the same `dcap-qvl` library users already trust.**
+
+#### B. Backend — replace the mock with a real provisioner
+
+`backend/src/lib/cvm-provider.ts` — interface that the sandbox routes call. Two implementations:
+
+```ts
+interface CVMProvider {
+  spawn(opts: { repoUrl: string; imageDigest: string }): Promise<{
+    cvmId: string;
+    wssUrl: string;   // wss://<host>/agent
+    publicKey: string; // for SPKI pin
+  }>;
+  attestationReport(cvmId: string, nonce: string): Promise<RawAttestation>;
+  destroy(cvmId: string): Promise<void>;
+}
+```
+
+| Provider | When |
+|---|---|
+| `MockProvider` | Today — keeps the mock stepper working in dev |
+| `PhalaProvider` | First real provider — fastest path to a working CVM since Phala's TDX nodes already expose `dcap-qvl`-compatible quotes |
+| `NearProvider` | Drop-in once NEAR opens a sandbox-CVM product (or we partner with them to host `confide-cvm` on their nodes) |
+
+Selection via env var: `CVM_PROVIDER=mock|phala|near`. The route code in `backend/src/routes/sandbox.ts` never changes.
+
+`backend/src/lib/dcap.ts` — wrap `dcap-qvl` (Node bindings) to verify the TDX quote server-side before releasing the WS URL + a session-scoped JWT to the browser. Same library NEAR's own `cvm-compose-files` repo references in its verifier examples.
+
+#### C. The handshake (already designed — see `md/08-playground-design.md §4`)
+
+Walk-through for "Import" on `/playground` after the CVM provider is wired:
+
+1. Browser hits `POST /v1/sandbox` with `repoUrl`.
+2. Backend calls `provider.spawn({ repoUrl, imageDigest: PINNED_CVM_DIGEST })`.
+3. Provider returns a `wssUrl` and `cvmId`.
+4. Backend pulls the TDX quote via `provider.attestationReport(cvmId, nonce)`.
+5. Backend runs `dcap.verifyQuote(quote)` — confirms hardware + checks `mr_config_id` matches the SHA256 of our published compose file.
+6. Backend mints a 5-min JWT bound to `cvmId + spkiHash` and writes it into the SandboxSession.
+7. Frontend polls `GET /v1/sandbox/:id`, sees `status: ready` + `wssUrl` + `jwt`.
+8. Browser opens `wss://<cvm>/agent` with `Authorization: <jwt>`.
+9. Browser fetches the TDX quote over the same WS connection and re-verifies in-browser (defense in depth — user doesn't have to trust the backend).
+10. On match, the UI unlocks: file tree fetched via `fs.list /workspace`, Monaco editor binds, terminal opens via `pty.open`.
+
+#### D. The in-browser IDE pieces
+
+`frontend/app/(workspace)/playground/` gets new components:
+
+| Component | Library | Purpose |
+|---|---|---|
+| `SandboxBridge.tsx` | native WebSocket | Multiplexes correlationId → response, exposes a typed `bridge.fs.list / fs.read / fs.write / pty.open / pty.input` surface |
+| `FileTree.tsx` | none | Calls `bridge.fs.list` recursively, renders an indented tree, click = open in editor |
+| `Editor.tsx` | `@monaco-editor/react` | Loads file via `bridge.fs.read`, autosaves via `bridge.fs.write` with debounce |
+| `Terminal.tsx` | `xterm` + `xterm-addon-fit` | Open a pty via `bridge.pty.open`, stream stdin/stdout, handle resize |
+| `RunButtons.tsx` | none | Quick actions: "npm install", "python main.py", "cargo run" — calls `bridge.pty.open` with cmd preset |
+| `ChatPanel.tsx` | none | Reuses the chat UI from `/chat` but routes through `bridge.chat.complete` (so prompts go via the CVM agent → NEAR, never via Confide backend) |
+
+The bridge protocol is already specified in `md/08-playground-design.md §5` — typed `ClientFrame` / `AgentFrame` with correlationIds. No invention needed; just implement it.
+
+### Order of operations to ship
+
+| Step | What | Estimated time | Blocking? |
+|---|---|---|---|
+| 1 | Write `cvm/Dockerfile` + `cvm/agent/main.go` (TLS bind, WS server skeleton, attest stub) | 1 day | No |
+| 2 | Set up GitHub Actions to build + push `confide-cvm` image to GHCR with Sigstore signing | 0.5 day | No |
+| 3 | Implement `backend/src/lib/cvm-provider.ts` interface + `MockProvider` (drop-in replacement for current mock) | 2 hr | No |
+| 4 | Implement `PhalaProvider` against Phala Cloud SDK (`@phala/dstack`) | 1 day | Phala API credentials (free tier exists) |
+| 5 | Implement `backend/src/lib/dcap.ts` with `dcap-qvl` Node bindings | 0.5 day | No |
+| 6 | Wire `dcap.verifyQuote` into `/v1/sandbox` to gate the JWT release | 2 hr | Step 5 |
+| 7 | Add `chat.complete` handler to `confide-agent` (Go) — forwards to NEAR with leased JWT | 0.5 day | NEAR credits unblocked |
+| 8 | Frontend: `SandboxBridge` + `FileTree` + `Editor` (Monaco) | 1 day | No |
+| 9 | Frontend: `Terminal` (xterm.js) + `RunButtons` | 0.5 day | No |
+| 10 | Frontend: `ChatPanel` reusing the existing chat workspace components | 2 hr | No |
+| 11 | E2E test: paste real repo URL, see it clone, edit `package.json`, run `npm install`, chat with the code | — | Steps 1–10 |
+
+**Realistic ship date for a usable in-browser TEE-attested IDE: 5–7 working days from "go".** Two of those depend on external unlocks: Phala credentials (free, fast) and NEAR credits (in progress per the credit conversation).
+
+### What we can ship before NEAR credits unblock
+
+| Already buildable | Blocked on NEAR credits |
+|---|---|
+| The CVM image + GHCR publishing | The `chat.complete` flow (uses the NEAR key) |
+| `PhalaProvider` + dcap verification | End-to-end "chat with the code" demo video |
+| File tree, Monaco editor, terminal, run buttons | — |
+| Sandbox spawn + attestation handshake | — |
+
+Translation: **80% of the playground IDE is build-able today without any new NEAR credits.** The chat-with-code feature is the only piece blocked, and even that becomes a one-line config change once credits are funded.
+
+### Trust-model invariants (do not break)
+
+These come straight from `md/08-playground-design.md §15` and apply to every shortcut anyone is tempted to take:
+
+- ❌ **No backend code execution.** The cloned repo runs inside the CVM TEE, never on Confide's Fastify backend.
+- ❌ **No static NEAR key inside the CVM image.** Always a session-scoped JWT lease — rotated per sandbox.
+- ❌ **No "skip attestation in dev mode" toggle.** Local dev runs without a CVM entirely (the mock provider), but when a real CVM is requested, attestation is non-bypassable.
+- ❌ **No egress beyond the allowlist** (`github.com`, `npm`, `pypi`, `crates.io`, `cloud-api.near.ai`, NTP).
+- ❌ **No persistence of `/workspace` by default.** Sessions are stateless v0; opt-in encrypted snapshots are v1.
+
+---
+
+## 13. Open Questions
 
 - **Real attestation shape**: NEAR's exact response fields for TEE attestation aren't visible without an API key. Need to call `/v1/chat/completions` once with a real key to inspect headers/extra fields.
 - **Naming**: `Confide` is placeholder. Real candidates: Sentinel, Vault, Hush, Cipher, Attest.
@@ -365,14 +495,14 @@ User trusts:  Confide UI shell (small)  +  NEAR TEE  +  Sandbox CVM TEE
 
 ---
 
-## 13. What's Already Saved
+## 14. What's Already Saved
 
 - `near-ai-cloud-api.md` — full API/auth/model/SLA reference compiled from NEAR docs + Scalar client.
 - `01-quickstart.md` through `07-api-endpoints.md` — NEAR AI Cloud docs captured from the official site.
 
 ---
 
-## 14. Definition of Done (MVP)
+## 15. Definition of Done (MVP)
 
 - [ ] Landing page renders cleanly in dark theme, mobile + desktop.
 - [ ] Chat workspace sends a prompt, gets a real reply from NEAR AI Cloud.
