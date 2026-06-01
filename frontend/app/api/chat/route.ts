@@ -90,8 +90,51 @@ export async function POST(req: Request) {
     | { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
     | undefined;
 
-  const attestation = (data as { attestation?: { tee?: string; hash?: string } })
-    .attestation;
+  const chatId = (data.id as string) ?? upstream.headers.get("x-request-id") ?? undefined;
+
+  // NEAR does not embed the attestation receipt in the chat response body.
+  // Pull it from /v1/signature/{chat_id} — the gateway signs every completion
+  // inside its TEE and caches the signature. Best-effort: if this 2nd hop
+  // fails we still return the reply with an unsigned receipt rather than
+  // erroring the whole call.
+  let signature: Receipt["signature"];
+  let signaturePayload: unknown;
+  if (chatId) {
+    try {
+      const sigRes = await fetch(
+        `${NEAR_BASE}/v1/signature/${encodeURIComponent(chatId)}`,
+        { headers: { authorization: `Bearer ${apiKey}` } }
+      );
+      if (sigRes.ok) {
+        const sigData = (await sigRes.json()) as {
+          text?: string;
+          signature?: string;
+          signing_address?: string;
+          signing_algo?: string;
+        };
+        signaturePayload = sigData;
+        if (sigData.text && sigData.signature && sigData.signing_address) {
+          // text = `${modelName}:${requestSha256}:${responseSha256}`
+          // model name can contain `/` but never `:`, so the last two
+          // colon-separated parts are always the hashes.
+          const parts = sigData.text.split(":");
+          const responseHash = parts.pop() ?? "";
+          const requestHash = parts.pop() ?? "";
+          signature = {
+            sig: sigData.signature,
+            signingAddress: sigData.signing_address,
+            signingAlgo: sigData.signing_algo ?? "ecdsa",
+            text: sigData.text,
+            requestHash,
+            responseHash,
+          };
+        }
+      }
+    } catch {
+      // Network blip — leave signature undefined; the receipt still carries
+      // the model output. The Scanner will show "Completed (no signature)".
+    }
+  }
 
   const receipt: Receipt = {
     model: (data.model as string) ?? model,
@@ -104,13 +147,15 @@ export async function POST(req: Request) {
           totalTokens: usage.total_tokens,
         }
       : undefined,
-    requestId:
-      (data.id as string) ?? upstream.headers.get("x-request-id") ?? undefined,
-    tee: attestation?.tee,
-    attestationHash: attestation?.hash,
-    attested: Boolean(attestation?.hash),
+    requestId: chatId,
+    // NEAR's gateway runs every completion in an Intel TDX confidential VM
+    // — fixed across this account, so we can label it once we have a sig.
+    tee: signature ? "Intel TDX" : undefined,
+    attestationHash: signature?.responseHash,
+    attested: Boolean(signature),
     mocked: false,
-    raw: data,
+    signature,
+    raw: { completion: data, signature: signaturePayload },
   };
 
   return NextResponse.json<ChatResponseBody>({ reply, receipt });

@@ -30,6 +30,21 @@ export interface Receipt {
   mocked: boolean;
   /** Raw NEAR response, kept for "view raw receipt". */
   raw?: unknown;
+  /** Signed receipt from GET /v1/signature/{chat_id} */
+  signature?: {
+    /** Hex ECDSA / Ed25519 signature over `text`. */
+    sig: string;
+    /** Public-key-derived address used to verify the signature. */
+    signingAddress: string;
+    /** `ecdsa` or `ed25519` */
+    signingAlgo: string;
+    /** Signed payload — `{model}:{requestHash}:{responseHash}` */
+    text: string;
+    /** SHA-256 of the request, parsed out of `text`. */
+    requestHash: string;
+    /** SHA-256 of the response, parsed out of `text`. */
+    responseHash: string;
+  };
 }
 
 export interface ChatRequestBody {
