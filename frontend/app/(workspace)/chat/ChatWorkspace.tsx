@@ -5,6 +5,7 @@ import { TopBar } from "@/app/components/workspace/TopBar";
 import { AVAILABLE_MODELS } from "@/lib/types";
 import type { ChatResponseBody, Message, Receipt } from "@/lib/types";
 import { logUsage, receiptToEvent } from "@/lib/usage";
+import { verifyReceipt, type VerifyResult } from "@/lib/verify";
 
 interface Turn {
   id: string;
@@ -278,6 +279,33 @@ function TurnView({
 }
 
 function ScannerPanel({ receipt }: { receipt: Receipt | undefined }) {
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+
+  // Reset verification state whenever the active receipt changes.
+  const requestId = receipt?.requestId;
+  useEffect(() => {
+    setVerifyResult(null);
+    setVerifying(false);
+  }, [requestId]);
+
+  async function runVerify() {
+    if (!receipt) return;
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const result = await verifyReceipt(receipt);
+      setVerifyResult(result);
+    } catch (err) {
+      setVerifyResult({
+        ok: false,
+        reason: err instanceof Error ? err.message : "Verification error",
+        attempts: [],
+      });
+    } finally {
+      setVerifying(false);
+    }
+  }
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 shrink-0 items-center border-b border-neutral-900 px-5">
@@ -316,8 +344,8 @@ function ScannerPanel({ receipt }: { receipt: Receipt | undefined }) {
                 receipt.mocked
                   ? "Stub response (NEAR_API_KEY not set)"
                   : receipt.attested
-                  ? "Attested inside TEE"
-                  : "Completed (no attestation field)"
+                  ? "Attested ✓ — signed inside TEE"
+                  : "Completed (no signature)"
               }
               tone={
                 receipt.mocked ? "warn" : receipt.attested ? "ok" : "neutral"
@@ -325,10 +353,36 @@ function ScannerPanel({ receipt }: { receipt: Receipt | undefined }) {
             />
             <Row label="TEE" value={receipt.tee ?? "—"} mono />
             <Row
-              label="Att. hash"
-              value={shortHash(receipt.attestationHash)}
+              label="Response hash"
+              value={shortHash(receipt.signature?.responseHash ?? receipt.attestationHash)}
+              mono
+              fullValue={receipt.signature?.responseHash ?? receipt.attestationHash}
+            />
+            <Row
+              label="Request hash"
+              value={shortHash(receipt.signature?.requestHash)}
+              mono
+              fullValue={receipt.signature?.requestHash}
+            />
+            <Row
+              label="Signing addr"
+              value={shortHash(receipt.signature?.signingAddress)}
+              mono
+              fullValue={receipt.signature?.signingAddress}
+            />
+            <Row
+              label="Sig algo"
+              value={receipt.signature?.signingAlgo ?? "—"}
               mono
             />
+            {receipt.signature?.text && (
+              <Row
+                label="Signed payload"
+                value={`${receipt.signature.text.slice(0, 22)}…`}
+                mono
+                fullValue={receipt.signature.text}
+              />
+            )}
             <Row label="Request ID" value={receipt.requestId ?? "—"} mono />
             <Row
               label="Latency"
@@ -347,6 +401,84 @@ function ScannerPanel({ receipt }: { receipt: Receipt | undefined }) {
               }
               mono
             />
+            {receipt.signature?.sig && (
+              <details className="rounded-lg border border-emerald-900/40 bg-emerald-950/10 p-3">
+                <summary className="flex cursor-pointer items-center justify-between gap-2 text-[0.7rem] uppercase tracking-widest text-emerald-300">
+                  <span>Signature</span>
+                  <CopyIconButton value={receipt.signature.sig} />
+                </summary>
+                <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-all font-mono text-[0.65rem] text-emerald-200/80">
+                  {receipt.signature.sig}
+                </pre>
+              </details>
+            )}
+
+            {/* Browser-side verification */}
+            {receipt.signature && (
+              <div className="rounded-lg border border-neutral-900 bg-black p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[0.7rem] uppercase tracking-widest text-neutral-500">
+                    Verify in browser
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void runVerify()}
+                    disabled={verifying}
+                    className="rounded-full border border-emerald-700/60 bg-emerald-900/30 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-widest text-emerald-200 transition hover:bg-emerald-900/50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {verifying
+                      ? "Verifying…"
+                      : verifyResult?.ok
+                      ? "Re-verify"
+                      : "Verify signature"}
+                  </button>
+                </div>
+                {verifyResult && (
+                  <div className="mt-3 space-y-1.5 text-[0.7rem]">
+                    {verifyResult.ok ? (
+                      <p className="text-emerald-300">
+                        ✓ Signature valid via{" "}
+                        <span className="font-mono text-emerald-200">
+                          {verifyResult.scheme}
+                        </span>
+                        . Recovered address matches the TEE&apos;s signing key
+                        — the model output came from the holder of{" "}
+                        <span className="font-mono">
+                          {shortHash(receipt.signature.signingAddress)}
+                        </span>{" "}
+                        and nothing has been altered in transit.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-amber-300">
+                          ⚠ Could not verify: {verifyResult.reason}
+                        </p>
+                        {verifyResult.attempts.length > 0 && (
+                          <div className="space-y-0.5 text-neutral-500">
+                            {verifyResult.attempts.map((a) => (
+                              <p key={a.scheme}>
+                                <span className="font-mono text-neutral-400">
+                                  {a.scheme}
+                                </span>
+                                {" → "}
+                                <span className="font-mono">{a.recovered}</span>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+                {!verifyResult && (
+                  <p className="mt-2 text-[0.65rem] leading-relaxed text-neutral-500">
+                    Runs keccak256 + secp256k1 ecrecover entirely in your browser.
+                    No round-trip to NEAR or to us — the proof stands or falls
+                    on math you can re-run yourself.
+                  </p>
+                )}
+              </div>
+            )}
             {receipt.raw !== undefined && (
               <details className="rounded-lg border border-neutral-900 bg-black p-3">
                 <summary className="cursor-pointer text-[0.7rem] uppercase tracking-widest text-neutral-500">
@@ -369,11 +501,14 @@ function Row({
   value,
   mono,
   tone = "neutral",
+  fullValue,
 }: {
   label: string;
   value: string;
   mono?: boolean;
   tone?: "neutral" | "ok" | "warn";
+  /** When provided, surface copy + open-in-tab affordances using this full value. */
+  fullValue?: string;
 }) {
   const toneClass =
     tone === "ok"
@@ -381,16 +516,56 @@ function Row({
       : tone === "warn"
       ? "text-amber-300"
       : "text-neutral-200";
+  const showActions =
+    typeof fullValue === "string" && fullValue.length > 0 && value !== "—";
   return (
     <div className="flex items-start justify-between gap-3">
       <dt className="text-[0.7rem] uppercase tracking-widest text-neutral-500">
         {label}
       </dt>
       <dd
-        className={`text-right ${mono ? "font-mono text-xs" : "text-sm"} ${toneClass}`}
+        className={`flex items-center justify-end gap-1 text-right ${
+          mono ? "font-mono text-xs" : "text-sm"
+        } ${toneClass}`}
       >
-        {value}
+        <span>{value}</span>
+        {showActions && <CopyIconButton value={fullValue} />}
       </dd>
     </div>
   );
 }
+
+function CopyIconButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          // clipboard blocked — silently no-op
+        }
+      }}
+      className="inline-flex h-5 w-5 items-center justify-center rounded text-neutral-500 transition hover:bg-neutral-900 hover:text-white"
+      title={copied ? "Copied" : "Copy"}
+      aria-label={copied ? "Copied" : "Copy to clipboard"}
+    >
+      {copied ? (
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ) : (
+        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+          <rect x="9" y="9" width="13" height="13" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 15V5a2 2 0 0 1 2-2h10" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
