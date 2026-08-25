@@ -27,7 +27,7 @@ Built on the open NEAR AI stack.
 | **Token usage tracking** | ✅ shipped | Backend appends `UsageEvent` per chat to `data/usage.jsonl`; cost computed from NEAR per-million pricing; `/usage/summary` returns totals + by-day + leaderboard in one call |
 | **Real CVM spawn (Phala adapter)** | ⏳ next | Replace the mock spawn with real TDX VMs — see [md/08-playground-design.md](./md/08-playground-design.md) phased plan |
 | **In-VM editor + terminal** | ⏳ next | Monaco editor + xterm.js terminal in browser, WS bridge to `confide-agent` Go binary inside the CVM |
-| **Frontend → backend chat handoff** | ⏳ next | One-file change: point `frontend/app/api/chat/route.ts` at `backend:4000/v1/chat` so usage events persist to disk |
+| **Frontend → backend chat handoff** | ✅ shipped | `frontend/app/api/chat/route.ts` proxies to `backend:4000/v1/chat`; backend now also fetches the per-message NEAR signature (`GET /v1/signature/{chat_id}`) so attestation + usage events persist to `data/usage.jsonl` |
 | **Privacy upgrade (E2EE / BYOK direct)** | later | Cut Confide's proxy out of the plaintext path — see [md/plan.md §10](./md/plan.md) |
 | **Pricing / Stripe** | later | Marketing copy only; pricing math is in the landing tiers |
 | **VS Code extension** | later | Real CDE clone after the web IDE is solid |
@@ -188,7 +188,7 @@ near boom/
 - ✅ Full NEAR AI Cloud docs captured in `md/` (quickstart, models, reasoning, private inference, gateway/TLS attestation, complete API endpoint reference)
 - ✅ Hosted brand logos on `/models` for Anthropic, Google, DeepSeek, OpenAI/GPT, Qwen/Alibaba, GLM/Z.ai (Moonshot + Black Forest Labs still on letter-badge fallback)
 - ✅ Silver/white MagicRings WebGL backdrop on the landing final CTA
-- ⏳ Live TEE attestation against a real response (blocked on NEAR account credits — key set but `HTTP 402 no_limit_configured`)
+- ✅ Live TEE attestation against a real response (previously blocked on NEAR account credits — confirmed working end-to-end as of 2026-08-25)
 - ⏳ "Verify receipt" button that calls `/v1/attestation/report` per message
 - ⏳ Local audit log (browser localStorage for receipt history)
 - ⏳ Live model list (call `GET /v1/model/list` instead of hardcoded picker)
