@@ -189,9 +189,9 @@ near boom/
 - ✅ Hosted brand logos on `/models` for Anthropic, Google, DeepSeek, OpenAI/GPT, Qwen/Alibaba, GLM/Z.ai (Moonshot + Black Forest Labs still on letter-badge fallback)
 - ✅ Silver/white MagicRings WebGL backdrop on the landing final CTA
 - ✅ Live TEE attestation against a real response (previously blocked on NEAR account credits — confirmed working end-to-end as of 2026-08-25)
-- ⏳ "Verify receipt" button that calls `/v1/attestation/report` per message
-- ⏳ Local audit log (browser localStorage for receipt history)
-- ⏳ Live model list (call `GET /v1/model/list` instead of hardcoded picker)
+- ✅ "Verify receipt" button — in-browser ECDSA verification of the signed receipt (`frontend/lib/verify.ts`)
+- ✅ Local audit log — browser localStorage receipt history (`frontend/lib/usage.ts`), plus server-side `data/usage.jsonl` since the backend handoff shipped
+- ✅ Live model list — `/chat` model picker now calls `GET /v1/models` (NEAR's real catalog, filtered to ready chat models) instead of the hardcoded array; this also fixed a bug where the old default (`claude-opus-4-7`) was silently not-ready on NEAR's side
 
 See [md/plan.md](./md/plan.md) for the full roadmap and [md/](./md) for the NEAR AI Cloud docs we've captured (quickstart, models, reasoning, private inference, gateway + TLS attestation, API endpoint reference).
 

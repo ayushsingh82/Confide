@@ -6,6 +6,7 @@ import { AVAILABLE_MODELS } from "@/lib/types";
 import type { ChatResponseBody, Message, Receipt } from "@/lib/types";
 import { logUsage, receiptToEvent } from "@/lib/usage";
 import { verifyReceipt, type VerifyResult } from "@/lib/verify";
+import { api, type LiveModel } from "@/lib/api";
 
 interface Turn {
   id: string;
@@ -26,6 +27,7 @@ function shortHash(h?: string) {
 }
 
 export function ChatWorkspace() {
+  const [models, setModels] = useState<LiveModel[]>(AVAILABLE_MODELS);
   const [model, setModel] = useState(AVAILABLE_MODELS[0].id);
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -38,6 +40,26 @@ export function ChatWorkspace() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [turns, pending]);
+
+  // Swap the hardcoded picker for NEAR's live, ready-only catalog once it
+  // loads. Falls back to AVAILABLE_MODELS (already the initial state) on
+  // any network/backend error, so the picker is never empty.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .models()
+      .then((live) => {
+        if (cancelled || live.length === 0) return;
+        setModels(live);
+        setModel((current) => (live.some((m) => m.id === current) ? current : live[0].id));
+      })
+      .catch(() => {
+        // Keep the static fallback list.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeReceipt =
     turns.find((t) => t.id === activeReceiptId)?.receipt ??
@@ -110,7 +132,7 @@ export function ChatWorkspace() {
               onChange={(e) => setModel(e.target.value)}
               className="rounded-md border border-neutral-800 bg-black px-3 py-1.5 text-sm text-white focus:border-neutral-600 focus:outline-none"
             >
-              {AVAILABLE_MODELS.map((m) => (
+              {models.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.label}
                 </option>

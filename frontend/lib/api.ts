@@ -50,6 +50,48 @@ export async function apiFetch<T>(
 
 // Typed shapes the frontend cares about (matches backend/src/types).
 
+export interface LiveModel {
+  id: string;
+  label: string;
+  contextLength?: number;
+  description?: string;
+}
+
+interface RawNearModel {
+  id: string;
+  name?: string;
+  is_ready?: boolean;
+  output_modalities?: string[];
+  context_length?: number;
+  description?: string;
+}
+
+interface ModelsResponse {
+  cached: boolean;
+  fallback?: boolean;
+  // Real NEAR catalog nests the array under `.data`; our no-key fallback
+  // (backend/src/routes/models.ts) returns it flat.
+  data: { data?: RawNearModel[] } | RawNearModel[];
+}
+
+// Ids that pass every other filter but aren't chat-completion models
+// (audio transcription, embeddings, reranking, image gen, moderation).
+const NON_CHAT_ID = /whisper|embedding|rerank|privacy-filter|flux/i;
+
+function normalizeModels(payload: ModelsResponse): LiveModel[] {
+  const raw = Array.isArray(payload.data) ? payload.data : payload.data.data ?? [];
+  return raw
+    .filter((m) => m.is_ready !== false)
+    .filter((m) => (m.output_modalities ?? ["text"]).includes("text"))
+    .filter((m) => !NON_CHAT_ID.test(m.id))
+    .map((m) => ({
+      id: m.id,
+      label: m.name ?? m.id,
+      contextLength: m.context_length,
+      description: m.description,
+    }));
+}
+
 export interface GithubUser {
   id: number;
   login: string;
@@ -90,6 +132,10 @@ export interface SandboxSession {
 }
 
 export const api = {
+  /** GET /v1/models — live NEAR catalog, filtered to ready chat-completion models. */
+  models(): Promise<LiveModel[]> {
+    return apiFetch<ModelsResponse>("/v1/models").then(normalizeModels);
+  },
   me(): Promise<MeResponse> {
     return apiFetch<MeResponse>("/v1/auth/me").catch((e: ApiError) => {
       if (e.status === 401) return { authenticated: false };
