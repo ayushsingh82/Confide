@@ -90,6 +90,38 @@ export async function chatCompletion(
   return { status: response.statusCode, data, latencyMs };
 }
 
+export interface RawSignature {
+  text?: string;
+  signature?: string;
+  signing_address?: string;
+  signing_algo?: string;
+}
+
+/**
+ * GET /v1/signature/{chat_id} — best-effort fetch of the signed attestation
+ * receipt for a completion. NEAR does not embed this in the chat completion
+ * body itself; the gateway signs every completion inside its TEE and caches
+ * the signature under the completion id. Returns undefined on any failure
+ * (missing id, network blip, non-200) so callers can still return the reply
+ * with an unsigned receipt rather than erroring the whole call.
+ */
+export async function getSignature(chatId: string): Promise<RawSignature | undefined> {
+  try {
+    const response = await request(
+      `${config.nearApiBase}/v1/signature/${encodeURIComponent(chatId)}`,
+      { method: "GET", headers: authHeaders() }
+    );
+    if (response.statusCode >= 400) {
+      await response.body.text();
+      return undefined;
+    }
+    const text = await response.body.text();
+    return JSON.parse(text) as RawSignature;
+  } catch {
+    return undefined;
+  }
+}
+
 /** GET /v1/models — proxy NEAR's OpenAI-compatible list endpoint. */
 export async function listModels(): Promise<unknown> {
   const response = await request(`${config.nearApiBase}/v1/models`, {

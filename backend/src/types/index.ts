@@ -38,6 +38,21 @@ export interface Attestation {
   attested: boolean;
 }
 
+export interface ReceiptSignature {
+  /** Hex ECDSA / Ed25519 signature over `text`. */
+  sig: string;
+  /** Public-key-derived address used to verify the signature. */
+  signingAddress: string;
+  /** `ecdsa` or `ed25519` */
+  signingAlgo: string;
+  /** Signed payload — `{model}:{requestHash}:{responseHash}` */
+  text: string;
+  /** SHA-256 of the request, parsed out of `text`. */
+  requestHash: string;
+  /** SHA-256 of the response, parsed out of `text`. */
+  responseHash: string;
+}
+
 export interface Receipt {
   id: string;
   model: string;
@@ -49,6 +64,8 @@ export interface Receipt {
   attestation: Attestation;
   /** True only when no NEAR_API_KEY is configured (stub mode). */
   mocked: boolean;
+  /** Signed receipt from GET /v1/signature/{chat_id}, when available. */
+  signature?: ReceiptSignature;
   /** Full upstream JSON, kept for `view raw receipt` in the UI. */
   raw?: unknown;
 }
