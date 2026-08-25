@@ -1,0 +1,66 @@
+# Builds confide-cvm, pushes it to GHCR, and signs the published digest with
+# cosign's keyless (OIDC) signing — same pattern nearaidev/cloud-api uses
+# (see md/05-gateway-verification.md). The published digest becomes the
+# `imageDigest` a CVMProvider pins when spawning a sandbox.
+#
+# NOTE: this workflow has not been run — this environment has no GHCR
+# credentials. It's reviewed for syntactic/structural correctness only.
+name: cvm-image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cvm/**"
+      - ".github/workflows/cvm-image.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write # required for cosign keyless signing
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/confide-cvm
+
+jobs:
+  build-sign-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: cvm
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign the published image digest (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+
+      - name: Summary
+        run: |
+          echo "Published: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"

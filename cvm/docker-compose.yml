@@ -1,0 +1,14 @@
+# Single-service compose file. Once this image is published, this file's
+# SHA256 becomes the CVM's `mr_config_id` (md/06-tls-attestation.md §8,
+# md/05-gateway-verification.md) — the value a browser checks to prove the
+# CVM is running exactly this published configuration, nothing else.
+services:
+  confide-agent:
+    image: ghcr.io/ayushsingh82/confide-cvm:latest
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - "8443:8443"
+    environment:
+      - WORKSPACE_ROOT=/workspace
+      - AGENT_ADDR=:8443

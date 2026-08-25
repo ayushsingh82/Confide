@@ -18,15 +18,17 @@ Built on the open NEAR AI stack.
 | **Landing page** | ✅ shipped | Dark marketing site — hero w/ NEAR pill, features, metrics, pricing tiers w/ real margins, silver MagicRings CTA, footer |
 | **Workspace shell** | ✅ shipped | Left sidebar (Chat / Playground / Browse Models / Usage / Settings) + top bar with profile menu + "NEAR TEE connected" badge |
 | **`/chat` workspace** | ✅ shipped | Chat panel + live Scanner panel; per-message attestation receipts (model, TEE, hash, latency, tokens); 5-model picker with real NEAR IDs |
-| **`/playground`** | ✅ shipped (mock CVM) | Paste GitHub URL → spawn confidential sandbox. Status pane stepper; trust-model explainer; real Phala/Azure spawn is P1 |
+| **`/playground`** | ✅ shipped (mock CVM) | Paste GitHub URL → spawn a real sandbox with a real interactive Monaco editor + xterm.js terminal + in-sandbox chat, all over a WS "agent bridge" protocol (`fs.*`/`pty.*`/`chat.complete`/`attest.report`). Today MockProvider serves that protocol from this backend (no TDX hardware); real CVM hosting is P1 |
 | **`/browse-models`** | ✅ shipped | NEAR-only catalog (40 models) with real provider logos for Anthropic / Google / DeepSeek / OpenAI / Qwen / GLM; search + category + creator filters |
 | **`/usage`** | ✅ shipped | Square stat grid (Agent Runs / Sessions / Tokens / USD) backed by per-request UsageEvent log; time-range tabs; per-day bar chart; per-model leaderboard |
 | **`/settings/profile`** | ✅ shipped | Avatar, linked emails with Primary/OAuth/Verified pills, danger zone |
 | **GitHub OAuth** | ✅ shipped | Connect GitHub from `/playground`, browse your repos, one-click import to spawn a sandbox. End users never see secrets — see [md/09-github-oauth.md](./md/09-github-oauth.md) |
 | **Backend service** | ✅ shipped | Fastify on `:4000` — `/v1/chat` (NEAR proxy), `/v1/usage/*`, `/v1/models`, `/v1/attestation/report`, `/v1/sandbox/*`, `/v1/auth/github/*`, `/v1/github/repos` |
 | **Token usage tracking** | ✅ shipped | Backend appends `UsageEvent` per chat to `data/usage.jsonl`; cost computed from NEAR per-million pricing; `/usage/summary` returns totals + by-day + leaderboard in one call |
-| **Real CVM spawn (Phala adapter)** | ⏳ next | Replace the mock spawn with real TDX VMs — see [md/08-playground-design.md](./md/08-playground-design.md) phased plan |
-| **In-VM editor + terminal** | ⏳ next | Monaco editor + xterm.js terminal in browser, WS bridge to `confide-agent` Go binary inside the CVM |
+| **In-VM editor + terminal** | ✅ shipped (mock CVM) | Real Monaco editor + real interactive xterm.js terminal (node-pty) over a WS bridge (`backend/src/lib/sandbox-agent-protocol.ts` + `frontend/.../playground/SandboxBridge.tsx`) — verified end-to-end with a live WS test script |
+| **Sandbox ChatPanel** | ✅ shipped (mock CVM) | Chat tab inside `/playground` routes through `bridge.chat.complete` (the WS agent), not `/api/chat` — verified with a real signed NEAR completion over the bridge |
+| **`CVMProvider` abstraction** | ✅ shipped (Mock only) | `backend/src/lib/cvm-provider.ts` — `MockProvider` real and wraps the local sandbox; `PhalaProvider`/`NearProvider` are typed stubs that throw until a hosting partnership exists. Selected via `CVM_PROVIDER=mock\|phala\|near` |
+| **`confide-cvm` Go agent + image** | ⏳ scaffolded | `cvm/agent/*.go` implements the same bridge protocol for a real CVM; `cvm/Dockerfile` + GitHub Actions Sigstore-signing workflow written. Blocked on a real TDX host (Phala/NEAR) to actually run inside — see `md/plan.md §12`/§13 |
 | **Frontend → backend chat handoff** | ✅ shipped | `frontend/app/api/chat/route.ts` proxies to `backend:4000/v1/chat`; backend now also fetches the per-message NEAR signature (`GET /v1/signature/{chat_id}`) so attestation + usage events persist to `data/usage.jsonl` |
 | **Privacy upgrade (E2EE / BYOK direct)** | later | Cut Confide's proxy out of the plaintext path — see [md/plan.md §10](./md/plan.md) |
 | **Pricing / Stripe** | later | Marketing copy only; pricing math is in the landing tiers |

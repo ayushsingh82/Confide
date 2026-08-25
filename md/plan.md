@@ -360,7 +360,9 @@ User trusts:  Confide UI shell (small)  +  NEAR TEE  +  Sandbox CVM TEE
 
 > **Status update (commit cd4bde8):** the local sandbox layer is *shipped*. Paste a GitHub URL → real `git clone`, real file tree, real editor with save, real exec with output. Full how-it-was-built doc at [`md/10-sandbox-implementation.md`](./10-sandbox-implementation.md).
 >
-> What's still pending: TDX CVM hosting (the two trust-model claims about "Intel TDX confidential VM" + "browser verifies the TDX quote"). The path to closing those is below — and the user-facing copy on `/playground` is already honest about which lines are ✅ vs ○ until then.
+> **Status update (2026-08-25):** the WS agent bridge protocol from §12.D below is shipped and real — Monaco editor, an interactive xterm.js terminal (node-pty), and in-sandbox chat all run over it, backed by `MockProvider`. The `confide-cvm` Go agent, Docker image, and egress allowlist are built and verified locally (compiles, runs, real WS round-trips, real iptables enforcement in a container). See the order-of-operations table below for the exact split.
+>
+> What's still pending: an actual TDX host to run `confide-cvm` on (the two trust-model claims about "Intel TDX confidential VM" + "browser verifies the TDX quote" need real hardware, not more local code), and the GHCR publish (needs registry credentials). The path to closing those is below — and the user-facing copy on `/playground` is already honest about which lines are ✅ vs ○ until then.
 
 > Original ask: the user wanted to *actually* edit and run the code inside a TEE. This section lays out exactly how — **using NEAR's own confidential infrastructure** rather than a third-party host.
 
@@ -458,30 +460,19 @@ The bridge protocol is already specified in `md/08-playground-design.md §5` —
 | 3 | Frontend `SandboxView` — three-pane file tree + editor + run buttons + output | 0.5 day | ✅ shipped (cd4bde8) |
 | 4 | Honest trust copy on `/playground` (replace overstated TDX claims) | 0.1 day | ✅ shipped (cd4bde8) |
 | 5 | Documentation: `md/10-sandbox-implementation.md` (how-it-was-built source of truth) | 0.2 day | ✅ shipped |
-| — | — *(line below this is gated on NEAR CVM hosting)* — | — | — |
-| 6 | Write `cvm/Dockerfile` + `cvm/agent/main.go` (TLS bind, WS server skeleton, attest stub) | 1 day | ⏳ pending NEAR CVM host |
-| 7 | GitHub Actions: build + push `confide-cvm` to GHCR with Sigstore signing | 0.5 day | ⏳ |
-| 8 | Extract `sandbox-store.ts` into `cvm-providers/local.ts` + write `cvm-providers/near.ts` | 0.5 day | ⏳ |
-| 9 | `backend/src/lib/dcap.ts` — `dcap-qvl` Node bindings, gate JWT release | 0.5 day | ⏳ |
-| 10 | Browser-side re-verification of the TDX quote over the WS before unlocking the editor | 0.5 day | ⏳ |
-| 11 | Replace textarea with Monaco; replace buffered exec with WS pty bridge | 1 day | ⏳ |
-| 12 | `ChatPanel` inside SandboxView routed through the CVM agent (NEAR key never touches Confide proxy) | 0.5 day | ⏳ NEAR credits |
-| 13 | Egress allowlist enforced inside the CVM image (iptables OUTPUT) | 0.5 day | ⏳ |
+| — | — *(line below this needed the WS bridge protocol + a CVM host)* — | — | — |
+| 6 | Write `cvm/Dockerfile` + `cvm/agent/main.go` (TLS bind, WS server, attest) | 1 day | ✅ built, compiles, run-verified locally (Docker) — not deployed to a real TDX host |
+| 7 | GitHub Actions: build + push `confide-cvm` to GHCR with Sigstore signing | 0.5 day | ⏳ written (`.github/workflows/cvm-image.yml`), not executable here — no registry credentials |
+| 8 | `CVMProvider` abstraction (`backend/src/lib/cvm-provider.ts`) — `MockProvider`/`PhalaProvider`/`NearProvider` | 0.5 day | ✅ `MockProvider` real (wraps the existing local sandbox); `PhalaProvider`/`NearProvider` are typed stubs that throw until a hosting partnership exists |
+| 9 | `backend/src/lib/dcap.ts` — attestation hash-comparison checks + JWT session gating | 0.5 day | ✅ hash checks hand-rolled (not the deprecated `dcap-qvl` npm package); `jwt.ts` gates the WS upgrade. Raw TDX quote binary parsing / PCK cert-chain verification is explicitly unimplemented — needs a real quote fixture |
+| 10 | Browser-side re-verification of the TDX quote over the WS before unlocking the editor | 0.5 day | ⏳ partial — the bridge fetches `attest.report` and renders an honest mock/attested badge; there's no real quote yet to re-verify, and the editor doesn't currently gate on it |
+| 11 | Replace textarea with Monaco; replace buffered exec with WS pty bridge | 1 day | ✅ shipped — real interactive terminal (node-pty) + Monaco editor, verified end-to-end over a live WS connection |
+| 12 | `ChatPanel` inside SandboxView routed through the CVM agent (NEAR key never touches Confide proxy) | 0.5 day | ✅ shipped — verified with a real signed NEAR completion over `bridge.chat.complete` |
+| 13 | Egress allowlist enforced inside the CVM image (iptables OUTPUT) | 0.5 day | ✅ written + verified in a real container (`--cap-add=NET_ADMIN`): `github.com` allowed, arbitrary hosts blocked. Requires that capability grant — the entrypoint logs a loud warning and runs unenforced without it, rather than silently no-op |
 
-**Shipped so far: 1.8 days of work covering steps 1–5.** Everything from step 6 onward is gated on the NEAR partnership — see §13.
+**Shipped: steps 1–5 (1.8 days) plus 6, 8, 9, 11, 12, 13 — the WS bridge protocol (fs/pty/chat/attest), Monaco, xterm, sandbox chat, `MockProvider`, and a real buildable `confide-cvm` Go agent + Docker image.** What's left is step 7 (needs GHCR credentials), step 10's editor-gating half, and the two things no amount of local work can substitute for: a real TDX host to run `confide-cvm` on, and a real quote to validate `dcap.ts`'s hash checks against. See §13 for the partnership plan that unblocks those.
 
-The trust truth-table flips its last two rows from ❌ to ✅ at step 9. The user-facing copy on `/playground` is already written to handle that transition: today it shows `○ Intel TDX CVM hosting is in progress`; the moment step 9 ships, that line becomes `✓` and no other copy change is needed.
-
-### What we can ship before NEAR credits unblock
-
-| Already buildable | Blocked on NEAR credits |
-|---|---|
-| The CVM image + GHCR publishing | The `chat.complete` flow (uses the NEAR key) |
-| `PhalaProvider` + dcap verification | End-to-end "chat with the code" demo video |
-| File tree, Monaco editor, terminal, run buttons | — |
-| Sandbox spawn + attestation handshake | — |
-
-Translation: **80% of the playground IDE is build-able today without any new NEAR credits.** The chat-with-code feature is the only piece blocked, and even that becomes a one-line config change once credits are funded.
+The trust truth-table's last two rows flip from ❌ to ✅ once `confide-cvm` actually runs inside a real TDX VM (step 7's publish + a real host, not step 9 — the JWT/hash-check plumbing is in place, but it has nothing real to verify yet). The user-facing copy on `/playground` already renders the honest interim state: an amber "mock sandbox — no TEE attestation" badge, not a fake ✓.
 
 ### Trust-model invariants (do not break)
 
