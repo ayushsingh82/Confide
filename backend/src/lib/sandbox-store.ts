@@ -20,6 +20,7 @@ import {
   sandboxRoot,
   workspaceRoot,
 } from "@/lib/sandbox-fs.js";
+import { mintSandboxToken } from "@/lib/jwt.js";
 import type { SandboxSession } from "@/types/index.js";
 
 const DEFAULT_TTL_MS = 30 * 60 * 1000;
@@ -88,6 +89,7 @@ async function boot(id: string, repoUrl: string): Promise<void> {
         // earlier mock state. Real TDX quote verification lands once we host
         // this on NEAR CVM infra (see plan.md §12).
         verified: false,
+        mocked: true,
       },
     });
   } catch (err) {
@@ -96,14 +98,26 @@ async function boot(id: string, repoUrl: string): Promise<void> {
   }
 }
 
+function agentWssUrl(id: string): string {
+  const httpUrl = new URL(config.publicBackendUrl);
+  const proto = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${httpUrl.host}/v1/sandbox/${id}/agent`;
+}
+
 export function createSandbox(repoUrl: string, ttlMs = DEFAULT_TTL_MS): SandboxSession {
   const now = Date.now();
+  const id = genId();
   const session: SandboxSession = {
-    id: genId(),
+    id,
     repoUrl,
     status: "queued",
     createdAt: now,
     expiresAt: now + ttlMs,
+    // Deterministic for MockProvider — no real attestation to wait on, so
+    // the bridge URL + session token are minted immediately rather than
+    // deferred to "ready" like the workspace clone is.
+    wssUrl: agentWssUrl(id),
+    jwt: mintSandboxToken(id),
   };
   sessions.set(session.id, session);
   // Kick the boot off without awaiting — the route returns immediately and

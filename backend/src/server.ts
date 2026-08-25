@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
+import websocket from "@fastify/websocket";
 import { config } from "@/config.js";
 import { initUsageStore } from "@/lib/usage-store.js";
 import { sweepExpired } from "@/lib/sandbox-store.js";
@@ -10,6 +11,7 @@ import { usageRoutes } from "@/routes/usage.js";
 import { modelsRoutes } from "@/routes/models.js";
 import { attestationRoutes } from "@/routes/attestation.js";
 import { sandboxRoutes } from "@/routes/sandbox.js";
+import { sandboxAgentRoutes } from "@/routes/sandbox-agent.js";
 import { authRoutes } from "@/routes/auth.js";
 import { githubRoutes } from "@/routes/github.js";
 
@@ -31,6 +33,7 @@ async function bootstrap(): Promise<void> {
       : config.corsOrigin.split(",").map((o) => o.trim());
   await app.register(cors, { origin: origins, credentials: true });
   await app.register(cookie, { secret: config.sessionSecret });
+  await app.register(websocket);
 
   await app.register(healthRoutes);
   await app.register(chatRoutes);
@@ -38,6 +41,7 @@ async function bootstrap(): Promise<void> {
   await app.register(modelsRoutes);
   await app.register(attestationRoutes);
   await app.register(sandboxRoutes);
+  await app.register(sandboxAgentRoutes);
   await app.register(authRoutes);
   await app.register(githubRoutes);
 

@@ -113,6 +113,43 @@ export async function listTree(
   return walk(root, 0, "");
 }
 
+export interface DirEntry {
+  name: string;
+  isDir: boolean;
+  size: number;
+}
+
+/** Single-level directory listing — what the fs.list bridge frame returns. */
+export async function listDir(sandboxId: string, userPath: string): Promise<DirEntry[]> {
+  const abs = resolveSafe(sandboxId, userPath);
+  let entries;
+  try {
+    entries = await fs.readdir(abs, { withFileTypes: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") throw new SandboxFsError("Directory not found", 404);
+    if (code === "ENOTDIR") throw new SandboxFsError("Not a directory", 400);
+    throw err;
+  }
+  const out: DirEntry[] = [];
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    if (entry.isDirectory()) {
+      out.push({ name: entry.name, isDir: true, size: 0 });
+    } else if (entry.isFile()) {
+      let size = 0;
+      try {
+        size = (await fs.stat(path.join(abs, entry.name))).size;
+      } catch {
+        // ignore
+      }
+      out.push({ name: entry.name, isDir: false, size });
+    }
+  }
+  out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
+  return out;
+}
+
 export async function readFile(
   sandboxId: string,
   userPath: string
@@ -155,6 +192,22 @@ export async function writeFile(
   await fs.writeFile(abs, contents, "utf8");
   const stat = await fs.stat(abs);
   return { path: userPath, size: stat.size };
+}
+
+export async function removeFile(sandboxId: string, userPath: string): Promise<{ path: string }> {
+  const root = workspaceRoot(sandboxId);
+  const abs = resolveSafe(sandboxId, userPath);
+  if (abs === root) {
+    throw new SandboxFsError("Refusing to delete the workspace root", 400);
+  }
+  try {
+    await fs.rm(abs, { recursive: true, force: false });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") throw new SandboxFsError("File not found", 404);
+    throw err;
+  }
+  return { path: userPath };
 }
 
 export async function removeAll(sandboxId: string): Promise<void> {

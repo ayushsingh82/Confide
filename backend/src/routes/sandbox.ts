@@ -1,11 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import {
-  createSandbox,
-  destroySandbox,
-  getSandbox,
-  listSandboxes,
-} from "@/lib/sandbox-store.js";
+import { getSandbox, listSandboxes } from "@/lib/sandbox-store.js";
+import { getProvider } from "@/lib/cvm-provider.js";
 import {
   listTree,
   readFile,
@@ -59,8 +55,19 @@ export async function sandboxRoutes(app: FastifyInstance): Promise<void> {
         .code(400)
         .send({ error: "Invalid body", issues: parsed.error.issues });
     }
-    const session = createSandbox(parsed.data.repoUrl, parsed.data.ttlMs);
-    return reply.code(201).send(session);
+    try {
+      const session = await getProvider().spawn({
+        repoUrl: parsed.data.repoUrl,
+        // Unused by MockProvider; real providers pin the published
+        // confide-cvm image digest here once one exists (plan.md §12.A).
+        imageDigest: "local-mock",
+        ttlMs: parsed.data.ttlMs,
+      });
+      return reply.code(201).send(session);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return reply.code(503).send({ error: message });
+    }
   });
 
   /** GET /v1/sandbox/:id — poll for status. */
@@ -74,8 +81,10 @@ export async function sandboxRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { id: string } }>(
     "/v1/sandbox/:id",
     async (req, reply) => {
-      const ok = destroySandbox(req.params.id);
-      if (!ok) return reply.code(404).send({ error: "Sandbox not found" });
+      if (!getSandbox(req.params.id)) {
+        return reply.code(404).send({ error: "Sandbox not found" });
+      }
+      await getProvider().destroy(req.params.id);
       return reply.code(204).send();
     }
   );

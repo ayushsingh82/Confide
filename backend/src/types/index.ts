@@ -113,6 +113,16 @@ export interface SandboxSession {
     tdxQuote?: string;
     spkiHash?: string;
     verified: boolean;
+    /**
+     * True whenever the sandbox is served by MockProvider (this backend, no
+     * real hardware) rather than a real CVM. The frontend must render this
+     * as an honest third state — never "verified", never "failed".
+     */
+    mocked: boolean;
   };
+  /** WebSocket URL for the bridge protocol (fs/pty/chat/attest frames). */
+  wssUrl?: string;
+  /** Short-lived session token, required to open the agent WS connection. */
+  jwt?: string;
   error?: string;
 }

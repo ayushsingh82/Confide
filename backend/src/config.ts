@@ -38,6 +38,16 @@ export const config = {
     "SESSION_SECRET",
     "dev-only-session-secret-change-me"
   ),
+
+  // Which CVMProvider backs /v1/sandbox spawns. "mock" (default) runs the
+  // sandbox locally on this backend host and serves the agent WS protocol
+  // itself — see lib/cvm-provider.ts. "phala"/"near" are unconfigured stubs
+  // until a real hosting partnership lands (see md/plan.md §13).
+  cvmProvider: readString("CVM_PROVIDER", "mock") as "mock" | "phala" | "near",
+  sandboxJwtSecret: readString(
+    "SANDBOX_JWT_SECRET",
+    "dev-only-sandbox-jwt-secret-change-me"
+  ),
 } as const;
 
 export const hasNearKey = config.nearApiKey.length > 0;
