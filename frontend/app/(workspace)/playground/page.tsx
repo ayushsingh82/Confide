@@ -270,6 +270,8 @@ function PlaygroundInner() {
             <SandboxView
               sandboxId={session.id}
               repoUrl={session.repoUrl}
+              wssUrl={session.wssUrl}
+              jwt={session.jwt}
               onDestroy={() => {
                 void api.destroySandbox(session.id);
                 setSession(null);

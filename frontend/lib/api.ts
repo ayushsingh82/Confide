@@ -127,7 +127,11 @@ export interface SandboxSession {
   status: "queued" | "spawning" | "cloning" | "ready" | "error" | "destroyed";
   createdAt: number;
   expiresAt: number;
-  attestation?: { verified: boolean };
+  attestation?: { verified: boolean; mocked: boolean };
+  /** WebSocket URL for the bridge protocol (fs/pty/chat/attest frames). */
+  wssUrl?: string;
+  /** Short-lived session token required to open the agent WS connection. */
+  jwt?: string;
   error?: string;
 }
 
